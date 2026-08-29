@@ -1,147 +1,232 @@
 'use client';
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useState } from 'react';
 
-export default function LandingPage() {
-  const [darkMode, setDarkMode] = useState(false);
+// Menú de ejemplo basado en el estilo de tu local (puedes cargarlo luego desde tu base de datos SQLite Cloud)
+const menuCategories = [
+  {
+    category: "🔥 COMBOS ESPECIALES",
+    items: [
+      { id: 1, name: "COMBO LOCURA", description: "24 Piezas Mixto + 3 Und Kokitos Cangrejo + Refresco de litro", price: 13.99 },
+      { id: 2, name: "COMBO PERSONAL", description: "12 Pieza de Cangrejo + Topping de Camarón + Ensalada Dinamita + Refresco 400 ml", price: 11.99 },
+      { id: 3, name: "COMBO FAMILIAR", description: "70 Piezas de Sushi Variados + Ensalada Dinamita + Kokitos de Cangrejo + Refresco de 2 Litros", price: 65.67 },
+      { id: 4, name: "COMBO DUO", description: "12 Pieza Mixto + Poke + Refresco de Litro", price: 14.99 },
+      { id: 5, name: "COMBO TAKOTAKOSUSHI", description: "36 Piezas de Sushi Mixto + Croquetas de Cangrejo + 2 Poke", price: 31.99 },
+    ]
+  },
+  {
+    category: "🍣 ROLLS FAVORITOS",
+    items: [
+      { id: 6, name: "PHILADELPHIA", description: "Roll de salmón, queso crema, aguacate con topping de ajonjolí", price: 9.90 },
+      { id: 7, name: "KANNY CRISPY", description: "Roll relleno de cangrejo crispiado dinamita queso crema aguacate cebollín topping de plátano", price: 7.30 },
+      { id: 8, name: "SUKIDRANGON", description: "Roll de pescado blanco dinamita queso crema aguacate topping de camarón con salsa udon", price: 9.99 },
+    ]
+  }
+];
 
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+export default function TakosushiMenu() {
+  const [cart, setCart] = useState<{ id: number; name: string; price: number; quantity: number }[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [customerName, setCustomerName] = useState('');
+  const [orderType, setOrderType] = useState('Mesa 01');
+
+  // Agregar al carrito
+  const addToCart = (product: { id: number; name: string; price: number }) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.id === product.id);
+      if (existing) {
+        return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+      }
+      return [...prev, { ...product, quantity: 1 }];
+    });
+    setIsCartOpen(true);
+  };
+
+  // Modificar cantidad
+  const updateQuantity = (id: number, delta: number) => {
+    setCart(prev => prev.map(item => {
+      if (item.id === id) {
+        const newQty = item.quantity + delta;
+        return newQty > 0 ? { ...item, quantity: newQty } : null;
+      }
+      return item;
+    }).filter(Boolean) as typeof cart);
+  };
+
+  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2);
+
+  // Enviar a WhatsApp
+  const checkoutWhatsApp = () => {
+    if (!customerName.trim()) {
+      alert('Por favor ingresa tu nombre o número de mesa.');
+      return;
     }
-  }, [darkMode]);
+
+    const phone = "584120000000"; // Reemplaza con el número real de WhatsApp del local
+    let message = `🍣 *NUEVO PEDIDO - TAKOSUSHI* 🍣\n\n`;
+    message += `👤 *Cliente:* ${customerName}\n`;
+    message += `📍 *Ubicación / Tipo:* ${orderType}\n`;
+    message += `-----------------------------------\n`;
+    
+    cart.forEach(item => {
+      message += `• ${item.quantity}x ${item.name} ($${(item.price * item.quantity).toFixed(2)})\n`;
+    });
+
+    message += `-----------------------------------\n`;
+    message += `💵 *TOTAL A PAGAR: $${totalPrice}*`;
+
+    const encodedURL = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    window.open(encodedURL, '_blank');
+  };
 
   return (
-    <div className={`min-h-screen flex flex-col justify-between selection:bg-blue-500 selection:text-white transition-colors duration-300 ${darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
-      {/* Barra de navegación */}
-      <header className={`max-w-7xl mx-auto w-full px-6 py-6 flex justify-between items-center border-b transition-colors duration-300 ${darkMode ? 'border-slate-900' : 'border-slate-200'}`}>
-        <div className="flex items-center gap-2">
-          <span className="text-2xl font-black text-blue-600 tracking-wider">⚡ POS Enterprise Venezuela</span>
+    <div className="min-h-screen bg-[#140005] text-white flex flex-col justify-between selection:bg-[#ff007f] selection:text-white">
+      
+      {/* Cabecera */}
+      <header className="border-b border-pink-900/40 px-6 py-6 flex justify-between items-center bg-[#1a0008]/80 backdrop-blur-md sticky top-0 z-40">
+        <div className="flex items-center gap-3">
+          <div className="bg-[#ff007f] text-white font-black px-3 py-1.5 rounded-xl text-lg shadow-lg shadow-[#ff007f]/30">
+            🍣 TAKO TAKO
+          </div>
+          <span className="text-xs uppercase tracking-widest text-pink-400 font-semibold hidden sm:inline">Cocina Asiática</span>
         </div>
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => setDarkMode(!darkMode)}
-            className={`p-2.5 rounded-xl text-sm font-semibold transition border ${darkMode ? 'bg-slate-900 border-slate-800 text-amber-400 hover:bg-slate-800' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm'}`}
-            title="Cambiar Modo Claro / Oscuro"
-          >
-            {darkMode ? '☀️ Modo Claro' : '🌙 Modo Oscuro'}
-          </button>
-
-          <Link className="text-sm font-medium transition hidden sm:inline-block opacity-80 hover:opacity-100" href="/login">
-            Ver demo
-          </Link>
-          <Link className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition shadow-lg shadow-blue-600/30" href="/login">
-            Entrar al Sistema
-          </Link>
-        </div>
+        <button 
+          onClick={() => setIsCartOpen(true)}
+          className="bg-[#ff007f] hover:bg-pink-600 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-[#ff007f]/30 transition"
+        >
+          🛒 Carrito ({totalItems}) - ${totalPrice}
+        </button>
       </header>
 
-      {/* Hero Principal */}
-      <main className="max-w-6xl mx-auto px-6 py-16 text-center flex flex-col items-center">
-        <span className="bg-blue-500/10 text-blue-600 border border-blue-500/20 text-xs font-semibold px-4 py-1.5 rounded-full uppercase tracking-wider mb-6">
-          🇻🇪 Diseñado para hacer crecer tu negocio sin límites
-        </span>
-        <h1 className="text-4xl sm:text-7xl font-extrabold tracking-tight leading-tight mb-6 max-w-4xl">
-          El motor que tu comercio merece: <span className="text-blue-600">Punto de Venta y Tu Propia Web Corporativa</span>
-        </h1>
-        <p className={`text-lg sm:text-xl max-w-3xl mb-10 leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-          Imagina tener el control absoluto de tus ventas en dólares y bolívares con tasa BCV, gestionar tu inventario al vuelo y, al mismo tiempo, proyectar una imagen profesional imbatible con una página web corporativa propia para tu marca. ¡Haz que tus clientes se enamoren de tu negocio desde el primer clic!
-        </p>
-
-        <div className="flex flex-col sm:flex-row gap-4 w-full justify-center mb-20">
-          <Link className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-8 py-4 rounded-xl text-lg transition shadow-xl shadow-blue-600/30" href="/login">
-            Iniciar Sesión en el Sistema
-          </Link>
-        </div>
-
-        {/* Sección Especial: Página Web Corporativa */}
-        <div className={`w-full border rounded-3xl p-8 sm:p-12 mb-16 text-left grid grid-cols-1 lg:grid-cols-2 gap-10 items-center transition-colors duration-300 ${darkMode ? 'bg-gradient-to-br from-blue-950/40 via-slate-900/60 to-slate-950 border-blue-500/30' : 'bg-gradient-to-br from-blue-50 via-white to-blue-50/50 border-blue-200 shadow-xl'}`}>
-          <div>
-            <span className="bg-blue-500/10 text-blue-600 border border-blue-500/20 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">
-              🌐 Presencia Digital Imparable
-            </span>
-            <h3 className="text-2xl sm:text-4xl font-extrabold mt-4 mb-4">Tu negocio con una Página Web Corporativa de Alto Impacto</h3>
-            <p className={`text-sm sm:text-base leading-relaxed mb-6 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              Hoy en día, un negocio que no tiene presencia en internet pierde clientes frente a la competencia. Con nuestra plataforma, no solo facturas en tu tienda física, sino que impulsas una <strong className="text-blue-600">página web profesional y moderna</strong> para tu marca, ideal para mostrar tus servicios, catálogos, ubicación y conectar de inmediato con nuevos compradores.
-            </p>
-            <ul className={`space-y-2.5 text-sm font-medium ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-              <li className="flex items-center gap-2">✨ Diseño elegante, rápido y adaptable a celulares (Responsive)</li>
-              <li className="flex items-center gap-2">✨ Autoridad de marca que inspira confianza absoluta</li>
-              <li className="flex items-center gap-2">✨ Canal directo para convertir visitantes en clientes fieles</li>
-            </ul>
-          </div>
-          <div className={`border p-8 rounded-2xl text-center space-y-4 ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200 shadow-md'}`}>
-            <div className="text-4xl">🚀</div>
-            <div className="text-xl font-bold">Tu marca en las grandes ligas</div>
-            <p className={`text-xs leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-              Integra tu punto de venta en la nube con una vitrina digital diseñada para destacar y vender más todos los días.
-            </p>
-          </div>
-        </div>
-
-        {/* Módulos Principales */}
-        <div className="w-full text-left mb-24">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold tracking-tight mb-3">Conoce todos los módulos diseñados para tu tranquilidad</h2>
-            <p className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Cada herramienta está pensada para ahorrarte tiempo, evitar pérdidas y automatizar tu operación.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className={`border p-8 rounded-2xl transition ${darkMode ? 'bg-slate-900/60 border-slate-800 hover:border-blue-500/50' : 'bg-white border-slate-200 shadow-md hover:border-blue-400'}`}>
-              <div className="text-3xl mb-4">💱</div>
-              <div className="text-blue-600 font-bold text-xl mb-2">Módulo Multi-Moneda & BCV</div>
-              <p className={`text-sm leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Sincronización automática de la tasa oficial del BCV. Realiza conversiones exactas y transparentes entre Dólares ($) y Bolívares (Bs.).</p>
-            </div>
-
-            <div className={`border p-8 rounded-2xl transition ${darkMode ? 'bg-slate-900/60 border-slate-800 hover:border-blue-500/50' : 'bg-white border-slate-200 shadow-md hover:border-blue-400'}`}>
-              <div className="text-3xl mb-4">💳</div>
-              <div className="text-blue-600 font-bold text-xl mb-2">Medios de Pago Venezolanos</div>
-              <p className={`text-sm leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Acepta sin enredos Efectivo USD, Pago Móvil, Zelle, Binance Pay y administra cómodamente tus créditos o cuentas por cobrar.</p>
-            </div>
-
-            <div className={`border p-8 rounded-2xl transition ${darkMode ? 'bg-slate-900/60 border-slate-800 hover:border-blue-500/50' : 'bg-white border-slate-200 shadow-md hover:border-blue-400'}`}>
-              <div className="text-3xl mb-4">🛡️</div>
-              <div className="text-blue-600 font-bold text-xl mb-2">Control de Roles y Permisos</div>
-              <p className={`text-sm leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Protege tu dinero e inventario asignando accesos específicos para cajeros, administradores y personal de almacén con total seguridad.</p>
-            </div>
-
-            <div className={`border p-8 rounded-2xl transition ${darkMode ? 'bg-slate-900/60 border-slate-800 hover:border-blue-500/50' : 'bg-white border-slate-200 shadow-md hover:border-blue-400'}`}>
-              <div className="text-3xl mb-4">📦</div>
-              <div className="text-blue-600 font-bold text-xl mb-2">Inventario en Tiempo Real</div>
-              <p className={`text-sm leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>El stock se descuenta automáticamente con cada venta. Recibe alertas de productos agotados y mantén tu negocio al día.</p>
-            </div>
-
-            <div className={`border p-8 rounded-2xl transition ${darkMode ? 'bg-slate-900/60 border-slate-800 hover:border-blue-500/50' : 'bg-white border-slate-200 shadow-md hover:border-blue-400'}`}>
-              <div className="text-3xl mb-4">📊</div>
-              <div className="text-blue-600 font-bold text-xl mb-2">Cierres de Caja & Reportes Z</div>
-              <p className={`text-sm leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Audita tus ingresos diarios desglosados por método de pago, calcula márgenes de ganancia y supervisa el flujo de caja sin dolores de cabeza.</p>
-            </div>
-
-            <div className={`border p-8 rounded-2xl transition ${darkMode ? 'bg-slate-900/60 border-slate-800 hover:border-blue-500/50' : 'bg-white border-slate-200 shadow-md hover:border-blue-400'}`}>
-              <div className="text-3xl mb-4">☁️</div>
-              <div className="text-blue-600 font-bold text-xl mb-2">Nube Segura y Confiable</div>
-              <p className={`text-sm leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Tus datos están protegidos y respaldados. Accede desde cualquier computadora, tablet o teléfono con velocidad óptima.</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Llamado a la acción final */}
-        <div className={`text-center border rounded-3xl p-10 sm:p-14 w-full transition-colors duration-300 ${darkMode ? 'bg-gradient-to-r from-blue-900/20 via-slate-900 to-blue-900/20 border-blue-500/20' : 'bg-blue-50 border-blue-200 shadow-xl'}`}>
-          <h3 className="text-2xl sm:text-4xl font-extrabold mb-4">Dale a tu negocio el impulso definitivo hoy</h3>
-          <p className={`text-sm sm:text-base max-w-xl mx-auto mb-8 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-            Únete a los emprendedores y comerciantes que ya están modernizando su manera de vender, cobrar y proyectarse al mundo.
+      {/* Banner / Hero */}
+      <main className="max-w-5xl mx-auto px-4 py-10 w-full flex-1">
+        <div className="text-center mb-12">
+          <span className="bg-[#ff007f]/20 text-pink-300 border border-[#ff007f]/40 text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-widest">
+            ✨ Menú Digital Interactivo
+          </span>
+          <h1 className="text-4xl sm:text-6xl font-black tracking-wider uppercase mt-4 mb-3 text-yellow-400 drop-shadow-md">
+            Nuestros Combos y Rolls
+          </h1>
+          <p className="text-pink-200/80 text-sm sm:text-base max-w-xl mx-auto">
+            Elige tus platos favoritos, arma tu pedido y envíalo al instante por WhatsApp para disfrutar el mejor sushi.
           </p>
-          <Link className="inline-block bg-blue-600 hover:bg-blue-500 text-white font-semibold px-8 py-4 rounded-xl text-base transition shadow-xl shadow-blue-600/30" href="/login">
-            Iniciar Sesión en el Sistema
-          </Link>
         </div>
+
+        {/* Listado del Menú Estilo Flyer */}
+        {menuCategories.map((cat, idx) => (
+          <div key={idx} className="mb-12">
+            <div className="bg-[#ff007f] text-white font-black text-xl sm:text-2xl py-3 px-6 rounded-2xl mb-6 shadow-lg uppercase tracking-wider transform -rotate-1">
+              {cat.category}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {cat.items.map(product => (
+                <div key={product.id} className="bg-[#1f030d] border border-pink-900/50 p-6 rounded-3xl flex flex-col justify-between shadow-xl hover:border-[#ff007f] transition">
+                  <div>
+                    <h3 className="text-yellow-400 font-extrabold text-lg sm:text-xl uppercase tracking-wide mb-2">{product.name}</h3>
+                    <p className="text-pink-100/70 text-xs sm:text-sm leading-relaxed mb-4">{product.description}</p>
+                  </div>
+                  <div className="flex justify-between items-center pt-4 border-t border-pink-950">
+                    <span className="bg-white text-slate-950 font-black px-4 py-1.5 rounded-xl text-lg shadow-inner">
+                      ${product.price.toFixed(2)}
+                    </span>
+                    <button 
+                      onClick={() => addToCart(product)}
+                      className="bg-[#ff007f] hover:bg-pink-600 text-white px-5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-md transition active:scale-95"
+                    >
+                      + Agregar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </main>
 
+      {/* Carrito Flotante / Modal Lateral */}
+      {isCartOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex justify-end">
+          <div className="bg-[#1c020b] w-full max-w-md h-full p-6 flex flex-col justify-between border-l border-pink-900/50 shadow-2xl animate-in slide-in-from-right duration-300">
+            <div>
+              <div className="flex justify-between items-center pb-4 border-b border-pink-900/50 mb-6">
+                <h2 className="text-xl font-black text-yellow-400">🛒 Tu Pedido Actual</h2>
+                <button 
+                  onClick={() => setIsCartOpen(false)}
+                  className="text-pink-400 hover:text-white font-bold text-lg px-2"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {cart.length === 0 ? (
+                <div className="text-center py-20 text-pink-300/60">
+                  <p className="text-4xl mb-3">🍣</p>
+                  <p>Tu carrito está vacío. ¡Agrega deliciosos rollos o combos!</p>
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
+                  {cart.map(item => (
+                    <div key={item.id} className="bg-[#140005] p-4 rounded-2xl border border-pink-950 flex justify-between items-center">
+                      <div>
+                        <h4 className="font-bold text-sm text-yellow-200">{item.name}</h4>
+                        <p className="text-xs text-pink-400">${item.price.toFixed(2)} c/u</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => updateQuantity(item.id, -1)} className="bg-pink-950 px-2.5 py-1 rounded-lg font-bold text-xs hover:bg-pink-900">-</button>
+                        <span className="font-bold text-sm">{item.quantity}</span>
+                        <button onClick={() => updateQuantity(item.id, 1)} className="bg-pink-950 px-2.5 py-1 rounded-lg font-bold text-xs hover:bg-pink-900">+</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Datos del Cliente y Botón WhatsApp */}
+            {cart.length > 0 && (
+              <div className="border-t border-pink-900/50 pt-4 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-pink-300 mb-1">Tu Nombre o Alias:</label>
+                  <input 
+                    type="text" 
+                    placeholder="Ej. Carlos Pérez" 
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    className="w-full bg-[#140005] border border-pink-900 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#ff007f]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-pink-300 mb-1">Mesa / Tipo de Pedido:</label>
+                  <input 
+                    type="text" 
+                    value={orderType}
+                    onChange={(e) => setOrderType(e.target.value)}
+                    className="w-full bg-[#140005] border border-pink-900 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#ff007f]"
+                  />
+                </div>
+
+                <div className="flex justify-between items-center text-lg font-black py-2">
+                  <span>Total a Pagar:</span>
+                  <span className="text-yellow-400 text-2xl">${totalPrice}</span>
+                </div>
+
+                <button 
+                  onClick={checkoutWhatsApp}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3.5 rounded-xl font-extrabold text-base shadow-xl shadow-emerald-600/30 transition flex items-center justify-center gap-2"
+                >
+                  🟢 Enviar Pedido por WhatsApp
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Pie de página */}
-      <footer className={`border-t py-8 text-center text-sm transition-colors duration-300 ${darkMode ? 'border-slate-900 text-slate-500' : 'border-slate-200 text-slate-500'}`}>
-        <p>POS Enterprise Venezuela • Todos los derechos reservados.</p>
+      <footer className="border-t border-pink-900/30 py-6 text-center text-xs text-pink-400/60 bg-[#1a0008]">
+        <p>Takosushi • Sistema de Menú Digital y Punto de Venta.</p>
       </footer>
     </div>
   );
