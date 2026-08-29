@@ -27,7 +27,15 @@ export default function TakosushiMenu() {
   const [cart, setCart] = useState<{ id: number; name: string; price: number; quantity: number }[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [customerName, setCustomerName] = useState('');
-  const [orderType, setOrderType] = useState('Mesa 01 / Web');
+  const [customerPhone, setCustomerPhone] = useState('');
+  
+  // Nuevos estados para Delivery y Pagos
+  const [orderType, setOrderType] = useState('Local / Mesa');
+  const [deliveryZone, setDeliveryZone] = useState('Guarenas');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('Efectivo / Divisas');
+  const [exchangeRate, setExchangeRate] = useState(65.50); // Puedes ajustar la tasa BCV del día aquí
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const addToCart = (product: { id: number; name: string; price: number }) => {
@@ -51,44 +59,55 @@ export default function TakosushiMenu() {
   };
 
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2);
+  const subtotalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+  // Calcular costo de delivery según opción
+  const deliveryCost = orderType === 'Delivery' ? (deliveryZone === 'Guarenas' ? 2.00 : 3.00) : 0;
+  const totalPrice = (subtotalPrice + deliveryCost).toFixed(2);
+  const totalBs = (parseFloat(totalPrice) * exchangeRate).toFixed(2);
 
   const checkoutWhatsApp = async () => {
-    if (!customerName.trim()) {
-      alert('Por favor ingresa tu nombre o número de mesa.');
+    if (!customerName.trim() || !customerPhone.trim()) {
+      alert('Por favor ingresa tu Nombre y Teléfono de contacto.');
+      return;
+    }
+
+    if (orderType === 'Delivery' && !deliveryAddress.trim()) {
+      alert('Por favor ingresa la dirección exacta para el delivery.');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // 1. Guardar el pedido en la base de datos a través de nuestra API
-      const response = await fetch('/api/orders', {
+      await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customerName,
-          orderType,
+          orderType: `${orderType} ${orderType === 'Delivery' ? `(${deliveryZone})` : ''}`,
           items: cart,
           total: parseFloat(totalPrice)
         })
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-        console.error('Error al registrar en BD:', data.error);
-      }
     } catch (error) {
-      console.error('Fallo de red al registrar pedido:', error);
+      console.error('Error al registrar:', error);
     } finally {
       setIsSubmitting(false);
     }
 
-    // 2. Construir mensaje de WhatsApp
-    const phone = "584120000000"; // Reemplaza con tu número real de WhatsApp
+    // Armar mensaje detallado para WhatsApp
+    const phone = "584120000000"; // Reemplaza con tu número de WhatsApp
     let message = `🍣 *NUEVO PEDIDO - TAKOSUSHI* 🍣\n\n`;
     message += `👤 *Cliente:* ${customerName}\n`;
-    message += `📍 *Ubicación / Tipo:* ${orderType}\n`;
+    message += `📞 *Teléfono:* ${customerPhone}\n`;
+    message += `📍 *Tipo de Servicio:* ${orderType} ${orderType === 'Delivery' ? `(${deliveryZone})` : ''}\n`;
+    
+    if (orderType === 'Delivery') {
+      message += `🏠 *Dirección:* ${deliveryAddress}\n`;
+    }
+
+    message += `💳 *Método de Pago:* ${paymentMethod}\n`;
     message += `-----------------------------------\n`;
     
     cart.forEach(item => {
@@ -96,7 +115,11 @@ export default function TakosushiMenu() {
     });
 
     message += `-----------------------------------\n`;
-    message += `💵 *TOTAL A PAGAR: $${totalPrice}*`;
+    if (orderType === 'Delivery') {
+      message += `🛵 *Delivery:* $${deliveryCost.toFixed(2)}\n`;
+    }
+    message += `💵 *TOTAL USD:* $${totalPrice}\n`;
+    message += `🇻🇪 *TOTAL BS (Tasa ${exchangeRate}):* Bs. ${totalBs}`;
 
     const encodedURL = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     window.open(encodedURL, '_blank');
@@ -111,7 +134,7 @@ export default function TakosushiMenu() {
           <div className="bg-[#ff007f] text-white font-black px-3 py-1.5 rounded-xl text-md shadow-lg shadow-[#ff007f]/30">
             🍣 TAKO TAKO
           </div>
-          <span className="text-xs uppercase tracking-widest text-pink-400 font-semibold hidden sm:inline">Cocina Asiática</span>
+          <span className="text-xs uppercase tracking-widest text-pink-400 font-semibold hidden sm:inline">Guarenas - Guatire</span>
         </div>
         
         <div className="flex items-center gap-3">
@@ -140,7 +163,7 @@ export default function TakosushiMenu() {
             Nuestros Combos y Rolls
           </h1>
           <p className="text-pink-200/80 text-xs sm:text-sm max-w-md mx-auto">
-            Toca en "+ Agregar" para sumar productos a tu pedido sin salir del menú.
+            Pide directo a tu casa en Guarenas y Guatire o ven a retirar.
           </p>
         </div>
 
@@ -179,7 +202,7 @@ export default function TakosushiMenu() {
       {totalItems > 0 && (
         <div className="fixed bottom-0 left-0 right-0 bg-[#1a0008]/95 border-t border-pink-900/60 p-4 backdrop-blur-lg z-40 flex justify-between items-center max-w-xl mx-auto sm:rounded-t-3xl shadow-2xl">
           <div>
-            <p className="text-xs text-pink-300">{totalItems} {totalItems === 1 ? 'producto' : 'productos'} en el carrito</p>
+            <p className="text-xs text-pink-300">{totalItems} {totalItems === 1 ? 'producto' : 'productos'}</p>
             <p className="text-lg font-black text-yellow-400">${totalPrice}</p>
           </div>
           <button 
@@ -194,25 +217,25 @@ export default function TakosushiMenu() {
       {/* MODAL / PANEL LATERAL DEL CARRITO */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex justify-end">
-          <div className="bg-[#1c020b] w-full max-w-md h-full p-6 flex flex-col justify-between border-l border-pink-900/50 shadow-2xl animate-in slide-in-from-right duration-300">
+          <div className="bg-[#1c020b] w-full max-w-md h-full p-6 flex flex-col justify-between border-l border-pink-900/50 shadow-2xl overflow-y-auto">
             <div>
               <div className="flex justify-between items-center pb-4 border-b border-pink-900/50 mb-4">
-                <h2 className="text-lg font-black text-yellow-400">🛒 Tu Pedido Actual</h2>
+                <h2 className="text-lg font-black text-yellow-400">🛒 Tu Pedido</h2>
                 <button 
                   onClick={() => setIsCartOpen(false)}
-                  className="bg-pink-950 text-pink-300 hover:text-white font-bold text-sm px-3 py-1.5 rounded-xl border border-pink-900"
+                  className="bg-pink-950 text-pink-300 hover:text-white font-bold text-xs px-3 py-1.5 rounded-xl border border-pink-900"
                 >
-                  ← Seguir Comprando
+                  ✕ Cerrar
                 </button>
               </div>
 
               {cart.length === 0 ? (
-                <div className="text-center py-20 text-pink-300/60">
+                <div className="text-center py-10 text-pink-300/60">
                   <p className="text-4xl mb-3">🍣</p>
                   <p className="text-sm">Tu carrito está vacío.</p>
                 </div>
               ) : (
-                <div className="space-y-3 max-h-[42vh] overflow-y-auto pr-1">
+                <div className="space-y-3 max-h-[30vh] overflow-y-auto pr-1 mb-4">
                   {cart.map(item => (
                     <div key={item.id} className="bg-[#140005] p-3 rounded-2xl border border-pink-950 flex justify-between items-center">
                       <div>
@@ -230,33 +253,104 @@ export default function TakosushiMenu() {
               )}
             </div>
 
-            {/* Datos del Cliente y Checkout */}
+            {/* Datos del Cliente, Delivery y Pagos */}
             {cart.length > 0 && (
-              <div className="border-t border-pink-900/50 pt-3 space-y-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-pink-300 mb-1">Tu Nombre o Alias:</label>
-                  <input 
-                    type="text" 
-                    placeholder="Ej. Carlos Pérez" 
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full bg-[#140005] border border-pink-900 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ff007f]"
-                  />
+              <div className="border-t border-pink-900/50 pt-4 space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-pink-300 mb-1">Tu Nombre:</label>
+                    <input 
+                      type="text" 
+                      placeholder="Ej. Carlos Pérez" 
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="w-full bg-[#140005] border border-pink-900 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ff007f]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-pink-300 mb-1">Teléfono:</label>
+                    <input 
+                      type="text" 
+                      placeholder="0412-0000000" 
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="w-full bg-[#140005] border border-pink-900 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ff007f]"
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-pink-300 mb-1">Mesa / Tipo de Pedido:</label>
-                  <input 
-                    type="text" 
+                  <label className="block text-[10px] font-semibold text-pink-300 mb-1">Tipo de Servicio:</label>
+                  <select 
                     value={orderType}
                     onChange={(e) => setOrderType(e.target.value)}
                     className="w-full bg-[#140005] border border-pink-900 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ff007f]"
-                  />
+                  >
+                    <option value="Local / Mesa">🍽️ Comer en Local / Mesa</option>
+                    <option value="Pickup">🏃‍♂️ Retirar en Local (Pickup)</option>
+                    <option value="Delivery">🛵 Delivery a Domicilio</option>
+                  </select>
                 </div>
 
-                <div className="flex justify-between items-center text-base font-black py-1">
-                  <span>Total a Pagar:</span>
-                  <span className="text-yellow-400 text-xl">${totalPrice}</span>
+                {orderType === 'Delivery' && (
+                  <div className="space-y-2 bg-[#140005] p-3 rounded-xl border border-pink-950">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-pink-300 mb-1">Zona de Delivery:</label>
+                      <select 
+                        value={deliveryZone}
+                        onChange={(e) => setDeliveryZone(e.target.value)}
+                        className="w-full bg-[#1a0008] border border-pink-900 rounded-lg px-2 py-1.5 text-xs text-white"
+                      >
+                        <option value="Guarenas">Guarenas ($2.00)</option>
+                        <option value="Guatire">Guatire ($3.00)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-pink-300 mb-1">Dirección Exacta / Urbanización:</label>
+                      <input 
+                        type="text" 
+                        placeholder="Ej. Urb. Trapichito, Manzana 12..." 
+                        value={deliveryAddress}
+                        onChange={(e) => setDeliveryAddress(e.target.value)}
+                        className="w-full bg-[#1a0008] border border-pink-900 rounded-lg px-2 py-1.5 text-xs text-white"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-pink-300 mb-1">Método de Pago:</label>
+                  <select 
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="w-full bg-[#140005] border border-pink-900 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ff007f]"
+                  >
+                    <option value="Efectivo / Divisas">💵 Efectivo Divisas ($)</option>
+                    <option value="Pago Móvil (Bs)">📱 Pago Móvil (Bolívares)</option>
+                    <option value="Zelle / Binance">🌐 Zelle / Binance</option>
+                  </select>
+                </div>
+
+                {/* Resumen de Cuentas */}
+                <div className="bg-[#140005] p-3 rounded-xl border border-pink-950 space-y-1 text-xs">
+                  <div className="flex justify-between text-pink-300/80">
+                    <span>Subtotal:</span>
+                    <span>${subtotalPrice.toFixed(2)}</span>
+                  </div>
+                  {orderType === 'Delivery' && (
+                    <div className="flex justify-between text-pink-300/80">
+                      <span>Delivery ({deliveryZone}):</span>
+                      <span>${deliveryCost.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-black text-sm text-yellow-400 pt-2 border-t border-pink-900/40">
+                    <span>Total USD:</span>
+                    <span>${totalPrice}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-pink-200">
+                    <span>Total Bolívares (Tasa {exchangeRate}):</span>
+                    <span>Bs. {totalBs}</span>
+                  </div>
                 </div>
 
                 <button 
@@ -264,7 +358,7 @@ export default function TakosushiMenu() {
                   disabled={isSubmitting}
                   className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white py-3 rounded-xl font-extrabold text-sm shadow-xl shadow-emerald-600/30 transition flex items-center justify-center gap-2"
                 >
-                  {isSubmitting ? 'Registrando pedido...' : '🟢 Enviar Pedido por WhatsApp'}
+                  {isSubmitting ? 'Registrando...' : '🟢 Enviar Pedido por WhatsApp'}
                 </button>
               </div>
             )}
@@ -272,9 +366,9 @@ export default function TakosushiMenu() {
         </div>
       )}
 
-      {/* Pie de página con acceso al login */}
+      {/* Pie de página */}
       <footer className="border-t border-pink-900/30 py-6 text-center text-xs text-pink-400/60 bg-[#1a0008] space-y-2">
-        <p>Takosushi • Sistema de Menú Digital y Punto de Venta.</p>
+        <p>Takosushi • Guarenas y Guatire.</p>
         <Link href="/login" className="text-pink-400 hover:text-white underline font-semibold inline-block">
           Acceso Administrativo / POS (Login)
         </Link>
