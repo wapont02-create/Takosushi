@@ -27,7 +27,8 @@ export default function TakosushiMenu() {
   const [cart, setCart] = useState<{ id: number; name: string; price: number; quantity: number }[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [customerName, setCustomerName] = useState('');
-  const [orderType, setOrderType] = useState('Mesa 01');
+  const [orderType, setOrderType] = useState('Mesa 01 / Web');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const addToCart = (product: { id: number; name: string; price: number }) => {
     setCart(prev => {
@@ -52,12 +53,38 @@ export default function TakosushiMenu() {
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
   const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2);
 
-  const checkoutWhatsApp = () => {
+  const checkoutWhatsApp = async () => {
     if (!customerName.trim()) {
       alert('Por favor ingresa tu nombre o número de mesa.');
       return;
     }
 
+    setIsSubmitting(true);
+
+    try {
+      // 1. Guardar el pedido en la base de datos a través de nuestra API
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName,
+          orderType,
+          items: cart,
+          total: parseFloat(totalPrice)
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        console.error('Error al registrar en BD:', data.error);
+      }
+    } catch (error) {
+      console.error('Fallo de red al registrar pedido:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+
+    // 2. Construir mensaje de WhatsApp
     const phone = "584120000000"; // Reemplaza con tu número real de WhatsApp
     let message = `🍣 *NUEVO PEDIDO - TAKOSUSHI* 🍣\n\n`;
     message += `👤 *Cliente:* ${customerName}\n`;
@@ -234,9 +261,10 @@ export default function TakosushiMenu() {
 
                 <button 
                   onClick={checkoutWhatsApp}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-extrabold text-sm shadow-xl shadow-emerald-600/30 transition flex items-center justify-center gap-2"
+                  disabled={isSubmitting}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white py-3 rounded-xl font-extrabold text-sm shadow-xl shadow-emerald-600/30 transition flex items-center justify-center gap-2"
                 >
-                  🟢 Enviar Pedido por WhatsApp
+                  {isSubmitting ? 'Registrando pedido...' : '🟢 Enviar Pedido por WhatsApp'}
                 </button>
               </div>
             )}
