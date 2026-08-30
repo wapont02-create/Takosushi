@@ -349,3 +349,4 @@ export default function ClientMenu({ initialCategories }: { initialCategories: a
     </div>
   );
 }
+// Actualizado
