@@ -70,8 +70,8 @@ export async function POST(request: Request) {
     if (action === 'open') {
       const usd = Number(openingUSD) || 0;
       const ves = Number(openingBs) || 0;
-      // Blindaje: Si no viene userId o es inválido, usar 1 por defecto para evitar errores de base de datos
-      const cleanUserId = Number(userId) || 1;
+      // Blindaje: Usar el ID 2 (Administrador Takosushi) por defecto si no viene un userId válido
+      const cleanUserId = Number(userId) || 2;
 
       // Buscar caja abierta
       const existing = await runQuery(async (db) => {
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
         });
       }
 
-      // INSERTAR CAJA (Con usuario por defecto seguro)
+      // INSERTAR CAJA (Con usuario administrador real por defecto)
       await runQuery(async (db) => {
         return await db.sql(
           `
