@@ -16,7 +16,7 @@ export async function GET() {
     db = new Database(connectionString);
     const result = await db.sql("SELECT * FROM sales WHERE status = 'pendiente' OR status IS NULL OR status = '' ORDER BY id DESC;");
     
-    // Cerramos la conexión explícitamente para no agotar el límite
+    // Cerramos la conexión explícitamente para liberar el recurso
     await db.close();
 
     return NextResponse.json({ success: true, orders: result });
