@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { Database } from '@sqlitecloud/drivers';
 
-// GET: Listar únicamente los pedidos pendientes
+// Fuerza a que la API sea dinámica y nunca guarde caché en Vercel
+export const dynamic = 'force-dynamic';
+
+// GET: Listar todos los pedidos pendientes
 export async function GET() {
   try {
     const connectionString = process.env.DATABASE_URL || process.env.SQLITECLOUD_CONNECTION_STRING;
@@ -11,7 +14,7 @@ export async function GET() {
     }
 
     const db = new Database(connectionString);
-    const result = await db.sql("SELECT * FROM sales WHERE status = 'pendiente' ORDER BY id DESC;");
+    const result = await db.sql("SELECT * FROM sales WHERE status = 'pendiente' OR status IS NULL OR status = '' ORDER BY id DESC;");
     
     return NextResponse.json({ success: true, orders: result });
   } catch (error: any) {
