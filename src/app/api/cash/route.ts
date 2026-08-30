@@ -70,7 +70,8 @@ export async function POST(request: Request) {
     if (action === 'open') {
       const usd = Number(openingUSD) || 0;
       const ves = Number(openingBs) || 0;
-      // Blindaje: Usar el ID 2 (Administrador Takosushi) por defecto si no viene un userId válido
+      
+      // Usamos el ID 2 (Administrador Takosushi) que sí existe en tu tabla users para cumplir la Foreign Key
       const cleanUserId = Number(userId) || 2;
 
       // Buscar caja abierta
@@ -96,7 +97,7 @@ export async function POST(request: Request) {
         });
       }
 
-      // INSERTAR CAJA (Con usuario administrador real por defecto)
+      // INSERTAR CAJA INCLUYENDO EL user_id PARA CUMPLIR LA RESTRICCIÓN
       await runQuery(async (db) => {
         return await db.sql(
           `
