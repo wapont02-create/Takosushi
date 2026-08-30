@@ -1,42 +1,34 @@
 import { NextResponse } from 'next/server';
-import { Client } from '@libsql/client';
-
-const db = Client({
-  url: process.env.DATABASE_URL || '',
-  authToken: process.env.DATABASE_AUTH_TOKEN || '',
-});
+import { Database } from '@sqlitecloud/drivers';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { customerName, orderType, items, total } = body;
+    const { customerName, orderType, items, total, totalBs, exchangeRate, paymentMethod } = body;
 
-    // Asegurar que la tabla existe con las columnas necesarias
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS sales (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        customerName TEXT,
-        orderType TEXT,
-        items TEXT,
-        total REAL,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    const connectionString = process.env.SQLITECLOUD_CONNECTION_STRING;
+    if (!connectionString) {
+      return NextResponse.json({ error: 'Falta configurar la conexión a SQLite Cloud' }, { status: 500 });
+    }
 
-    // Insertar el pedido en la base de datos
-    await db.execute({
-      sql: 'INSERT INTO sales (customerName, orderType, items, total) VALUES (?, ?, ?, ?)',
-      args: [
-        customerName || 'Cliente Web',
-        orderType || 'Local',
-        JSON.stringify(items || []),
-        Number(total) || 0
-      ]
-    });
+    const db = new Database(connectionString);
 
-    return NextResponse.json({ success: true, message: 'Pedido registrado correctamente' });
-  } catch (error) {
-    console.error('Error al guardar el pedido:', error);
-    return NextResponse.json({ success: false, error: 'Error interno del servidor' }, { status: 500 });
+    // Insertar usando los nombres exactos de columnas de tu tabla sales
+    const query = `
+      INSERT INTO sales (total_usd, total_ves, exchange_rate, payment_method, created_at) 
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP);
+    `;
+    
+    await db.sql(query, [
+      Number(total) || 0,
+      Number(totalBs) || 0,
+      Number(exchangeRate) || 65.50,
+      paymentMethod || 'Efectivo / Divisas'
+    ]);
+
+    return NextResponse.json({ success: true, message: 'Venta registrada correctamente en el sistema' });
+  } catch (error: any) {
+    console.error('Error al guardar el pedido en la BD:', error);
+    return NextResponse.json({ error: error.message || 'Error interno al procesar el pedido' }, { status: 500 });
   }
 }
