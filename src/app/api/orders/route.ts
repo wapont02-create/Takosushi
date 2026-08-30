@@ -14,22 +14,21 @@ export async function POST(request: Request) {
 
     const db = new Database(connectionString);
 
-    // Consulta adaptada con los 6 campos correspondientes a la estructura de tu tabla sales
+    // Limpieza y conversión segura de valores
+    const numTotal = Number(total) || 0;
+    const numTotalBs = Number(totalBs) || 0;
+    const numExchange = Number(exchangeRate) || 65.50;
+    const cleanPayment = String(paymentMethod || 'Efectivo / Divisas').replace(/'/g, "''");
+
+    // Consulta directa sin parámetros (?, ?) para evitar cualquier error de binding en SQLite Cloud
     const query = `
-      INSERT INTO sales (customer_id, total_usd, payment_method, cash_register_id, total_ves, exchange_rate) 
-      VALUES (?, ?, ?, ?, ?, ?);
+      INSERT INTO sales (total_usd, total_ves, exchange_rate, payment_method) 
+      VALUES (${numTotal}, ${numTotalBs}, ${numExchange}, '${cleanPayment}');
     `;
     
-    await db.sql(query, [
-      null,                           // customer_id (opcional/nulo si es pedido web rápido)
-      Number(total) || 0,             // total_usd
-      paymentMethod || 'Efectivo / Divisas', // payment_method
-      null,                           // cash_register_id (opcional/nulo)
-      Number(totalBs) || 0,           // total_ves
-      Number(exchangeRate) || 65.50   // exchange_rate
-    ]);
+    await db.sql(query);
 
-    return NextResponse.json({ success: true, message: 'Venta registrada correctamente en SQLite Cloud' });
+    return NextResponse.json({ success: true, message: 'Venta registrada correctamente' });
   } catch (error: any) {
     console.error('Error al guardar el pedido en la BD:', error);
     return NextResponse.json({ error: error.message || 'Error interno al procesar el pedido' }, { status: 500 });
