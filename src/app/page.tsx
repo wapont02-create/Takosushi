@@ -1,19 +1,34 @@
+import ClientMenu from '@/components/ClientMenu';
 import { Database } from '@sqlitecloud/drivers';
-import ClientMenu from '@/components/ClientMenu'; // Componente cliente para el carrito y WhatsApp
 
-// Función para obtener los productos directamente de SQLite Cloud
+// Forzar que esta página sea dinámica y consulte la base de datos en tiempo real
+export const dynamic = 'force-dynamic';
+
 async function getProducts() {
   try {
-    const connectionString = process.env.SQLITECLOUD_CONNECTION_STRING;
-    if (!connectionString) return [];
+    // Busca cualquiera de las dos variables para asegurar la conexión de inmediato
+    const connectionString = process.env.DATABASE_URL || process.env.SQLITECLOUD_CONNECTION_STRING;
+    
+    if (!connectionString) {
+      console.error('Falta la cadena de conexión en las variables de entorno de Vercel');
+      return [];
+    }
 
     const db = new Database(connectionString);
-    const result = await db.sql('SELECT id, name, description, price_usd, category FROM products;');
+    const result: any = await db.sql('SELECT id, name, description, price_usd, category FROM products;');
     
-    // SQLite Cloud puede retornar un array de filas directamente o envuelto
-    return Array.isArray(result) ? result : [];
+    // Manejo robusto de los formatos de respuesta del driver de SQLite Cloud
+    if (Array.isArray(result)) return result;
+    if (result && Array.isArray(result.rows)) return result.rows;
+    if (result && typeof result === 'object') {
+      const values = Object.values(result);
+      if (Array.isArray(values[0])) return values[0];
+      return values;
+    }
+
+    return [];
   } catch (error) {
-    console.error('Error al cargar productos desde la BD:', error);
+    console.error('Error al conectar con SQLite Cloud:', error);
     return [];
   }
 }
@@ -21,21 +36,24 @@ async function getProducts() {
 export default async function TakosushiMenuPage() {
   const products = await getProducts();
 
-  // Organizar los productos por categorías
   const categoriesMap: { [key: string]: any[] } = {};
   
-  products.forEach((prod: any) => {
-    const cat = prod.category || 'VARIOS';
-    if (!categoriesMap[cat]) {
-      categoriesMap[cat] = [];
-    }
-    categoriesMap[cat].push({
-      id: prod.id,
-      name: prod.name,
-      description: prod.description || '',
-      price: prod.price_usd || 0
+  if (Array.isArray(products) && products.length > 0) {
+    products.forEach((prod: any) => {
+      if (!prod || !prod.name) return;
+      
+      const cat = prod.category || 'COMBOS Y ROLLS';
+      if (!categoriesMap[cat]) {
+        categoriesMap[cat] = [];
+      }
+      categoriesMap[cat].push({
+        id: prod.id || Math.random(),
+        name: prod.name,
+        description: prod.description || '',
+        price: prod.price_usd ? Number(prod.price_usd) : 0
+      });
     });
-  });
+  }
 
   const menuCategories = Object.keys(categoriesMap).map(cat => ({
     category: cat,
@@ -44,7 +62,6 @@ export default async function TakosushiMenuPage() {
 
   return (
     <main className="min-h-screen bg-[#140005] text-white flex flex-col justify-between selection:bg-[#ff007f] selection:text-white pb-24">
-      {/* Pasamos los productos dinámicos al componente interactivo del carrito */}
       <ClientMenu initialCategories={menuCategories} />
     </main>
   );
