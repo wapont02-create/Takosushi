@@ -20,15 +20,15 @@ export async function POST(request: Request) {
     const numExchange = Number(exchangeRate) || 65.50;
     const cleanPayment = String(paymentMethod || 'Efectivo / Divisas').replace(/'/g, "''");
 
-    // Consulta directa sin parámetros (?, ?) para evitar cualquier error de binding en SQLite Cloud
+    // Consulta directa incluyendo el estatus 'pendiente'
     const query = `
-      INSERT INTO sales (total_usd, total_ves, exchange_rate, payment_method) 
-      VALUES (${numTotal}, ${numTotalBs}, ${numExchange}, '${cleanPayment}');
+      INSERT INTO sales (total_usd, total_ves, exchange_rate, payment_method, status) 
+      VALUES (${numTotal}, ${numTotalBs}, ${numExchange}, '${cleanPayment}', 'pendiente');
     `;
     
     await db.sql(query);
 
-    return NextResponse.json({ success: true, message: 'Venta registrada correctamente' });
+    return NextResponse.json({ success: true, message: 'Pedido registrado correctamente como pendiente' });
   } catch (error: any) {
     console.error('Error al guardar el pedido en la BD:', error);
     return NextResponse.json({ error: error.message || 'Error interno al procesar el pedido' }, { status: 500 });
