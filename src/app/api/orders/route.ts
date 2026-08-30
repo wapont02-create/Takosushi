@@ -6,14 +6,17 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { customerName, orderType, items, total, totalBs, exchangeRate, paymentMethod } = body;
 
-    const connectionString = process.env.SQLITECLOUD_CONNECTION_STRING;
+    // Acepta cualquiera de las dos variables de entorno configuradas en Vercel
+    const connectionString = process.env.DATABASE_URL || process.env.SQLITECLOUD_CONNECTION_STRING;
+    
     if (!connectionString) {
+      console.error('Falta configurar la cadena de conexión en Vercel');
       return NextResponse.json({ error: 'Falta configurar la conexión a SQLite Cloud' }, { status: 500 });
     }
 
     const db = new Database(connectionString);
 
-    // Insertar usando los nombres exactos de columnas de tu tabla sales
+    // Inserción limpia adaptada a tu tabla sales
     const query = `
       INSERT INTO sales (total_usd, total_ves, exchange_rate, payment_method, created_at) 
       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP);
