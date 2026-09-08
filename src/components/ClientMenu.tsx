@@ -7,7 +7,7 @@ interface MenuItem {
   name: string;
   price: number;
   description?: string;
-  image_url?: string; // Apuntando al nombre exacto de tu columna en SQLite Cloud
+  image_url?: string;
 }
 
 interface MenuCategory {
@@ -180,7 +180,7 @@ export default function ClientMenu({ initialCategories }: { initialCategories: M
                 {cat.items.map((product: MenuItem) => (
                   <div key={product.id} className="bg-[#1f030d] border border-pink-900/50 rounded-3xl overflow-hidden flex flex-col shadow-xl">
                     
-                    {/* IMAGEN PROTAGONISTA ARRIBA (Usando image_url) */}
+                    {/* IMAGEN PROTAGONISTA ARRIBA */}
                     <div className="w-full h-48 sm:h-56 bg-black/50 relative overflow-hidden border-b border-pink-900/40 flex-shrink-0">
                       {product.image_url && product.image_url.trim() !== '' && product.image_url !== 'NULL' && product.image_url !== 'EMPTY_STRING' ? (
                         <img 
