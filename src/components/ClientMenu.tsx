@@ -7,7 +7,7 @@ interface MenuItem {
   name: string;
   price: number;
   description?: string;
-  image?: string;
+  image_url?: string; // Apuntando al nombre exacto de tu columna en SQLite Cloud
 }
 
 interface MenuCategory {
@@ -180,15 +180,15 @@ export default function ClientMenu({ initialCategories }: { initialCategories: M
                 {cat.items.map((product: MenuItem) => (
                   <div key={product.id} className="bg-[#1f030d] border border-pink-900/50 rounded-3xl overflow-hidden flex flex-col shadow-xl">
                     
-                    {/* IMAGEN PROTAGONISTA ARRIBA */}
-                    <div className="w-full h-48 sm:h-56 bg-black/50 relative overflow-hidden border-b border-pink-900/40">
-                      {product.image && product.image.trim() !== '' ? (
+                    {/* IMAGEN PROTAGONISTA ARRIBA (Usando image_url) */}
+                    <div className="w-full h-48 sm:h-56 bg-black/50 relative overflow-hidden border-b border-pink-900/40 flex-shrink-0">
+                      {product.image_url && product.image_url.trim() !== '' && product.image_url !== 'NULL' && product.image_url !== 'EMPTY_STRING' ? (
                         <img 
-                          src={product.image} 
+                          src={product.image_url} 
                           alt={product.name} 
                           className="w-full h-full object-cover hover:scale-105 transition duration-500"
                           onError={(e) => {
-                            (e.currentTarget.parentElement as HTMLElement).style.display = 'none';
+                            (e.currentTarget.parentElement as HTMLElement).innerHTML = '<div class="w-full h-full bg-[#140005] flex items-center justify-center text-pink-500/40 text-xs font-medium tracking-widest uppercase">📷 Sin imagen disponible</div>';
                           }}
                         />
                       ) : (
@@ -198,18 +198,18 @@ export default function ClientMenu({ initialCategories }: { initialCategories: M
                       )}
                     </div>
 
-                    {/* DESCRIPCIÓN Y CONTENIDO ABAJO */}
-                    <div className="p-5 flex-1 flex flex-col justify-between">
+                    {/* CONTENIDO Y BOTÓN ABAJO */}
+                    <div className="p-5 flex-1 flex flex-col justify-between gap-4">
                       <div>
                         <h3 className="text-yellow-400 font-extrabold text-base sm:text-lg uppercase tracking-wide mb-1.5">
                           {product.name}
                         </h3>
-                        <p className="text-pink-100/70 text-xs sm:text-sm leading-relaxed mb-4">
+                        <p className="text-pink-100/70 text-xs sm:text-sm leading-relaxed">
                           {product.description || 'Delicioso plato preparado al momento con los mejores ingredientes.'}
                         </p>
                       </div>
 
-                      <div className="flex justify-between items-center pt-3 border-t border-pink-950">
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-pink-950 mt-auto">
                         <span className="bg-white text-slate-950 font-black px-3 py-1.5 rounded-xl text-base shadow-inner">
                           ${product.price.toFixed(2)}
                         </span>
