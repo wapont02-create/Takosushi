@@ -13,7 +13,7 @@ type Product = {
   category: string; 
   taxable: boolean;  
   stock: number;     
-  image?: string;    // <--- Campo de imagen opcional
+  image?: string;    // Campo de imagen opcional
 };
 
 type CartItem = Product & { quantity: number };
@@ -327,7 +327,7 @@ export default function DashboardPOS() {
   const [newCategory, setNewCategory] = useState('Comida');
   const [newTaxable, setNewTaxable] = useState(true);
   const [newStock, setNewStock] = useState('');
-  const [newImage, setNewImage] = useState(''); // <--- Estado para la URL de la imagen
+  const [newImage, setNewImage] = useState(''); // Estado para la URL de la imagen
 
   const [lastPrintedSale, setLastPrintedSale] = useState<any>(null);
   const [successModalData, setSuccessModalData] = useState<{ isOpen: boolean; changeUSD: number; changeBs: number; isCredit: boolean; clientName?: string } | null>(null);
@@ -682,7 +682,7 @@ export default function DashboardPOS() {
           category: newCategory,
           taxable: newTaxable,
           stock: parseInt(newStock),
-          image: newImage // <--- Se envía la URL de la imagen al backend
+          image: newImage // Envío de la URL de la imagen al backend
         })
       });
       const data = await res.json();
@@ -890,7 +890,7 @@ export default function DashboardPOS() {
           </div>
         )}
 
-        {/* TAB 1: POS (Con soporte visual para imágenes de productos) */}
+        {/* TAB 1: POS (Con visualización de imágenes de productos) */}
         {activeTab === 'pos' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-4">
