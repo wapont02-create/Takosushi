@@ -89,8 +89,6 @@ export default function ClientMenu({ initialCategories }: { initialCategories: M
         throw new Error(data.error || 'Error al registrar en el sistema');
       }
 
-      console.log('Pedido guardado con éxito en la BD:', data);
-
     } catch (error: any) {
       console.error('Error al registrar pedido:', error);
       alert('Hubo un problema al registrar en la base de datos: ' + error.message);
@@ -173,50 +171,57 @@ export default function ClientMenu({ initialCategories }: { initialCategories: M
           </div>
         ) : (
           initialCategories.map((cat, idx) => (
-            <div key={idx} className="mb-10">
-              <div className="bg-[#ff007f] text-white font-black text-lg sm:text-xl py-2.5 px-5 rounded-2xl mb-5 shadow-lg uppercase tracking-wider transform -rotate-1">
+            <div key={idx} className="mb-12">
+              <div className="bg-[#ff007f] text-white font-black text-lg sm:text-xl py-2.5 px-5 rounded-2xl mb-6 shadow-lg uppercase tracking-wider transform -rotate-1">
                 {cat.category}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {cat.items.map((product: MenuItem) => (
-                  <div key={product.id} className="bg-[#1f030d] border border-pink-900/50 p-4 rounded-3xl flex gap-4 items-center justify-between shadow-xl">
+                  <div key={product.id} className="bg-[#1f030d] border border-pink-900/50 rounded-3xl overflow-hidden flex flex-col shadow-xl">
                     
-                    {/* Renderizado de la Imagen por URL */}
-                    {product.image && product.image.trim() !== '' ? (
-                      <div className="relative w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 bg-black/40 rounded-2xl overflow-hidden border border-pink-900/40">
+                    {/* IMAGEN PROTAGONISTA ARRIBA */}
+                    <div className="w-full h-48 sm:h-56 bg-black/50 relative overflow-hidden border-b border-pink-900/40">
+                      {product.image && product.image.trim() !== '' ? (
                         <img 
                           src={product.image} 
                           alt={product.name} 
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover hover:scale-105 transition duration-500"
                           onError={(e) => {
                             (e.currentTarget.parentElement as HTMLElement).style.display = 'none';
                           }}
                         />
-                      </div>
-                    ) : (
-                      <div className="w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 bg-[#140005] rounded-2xl flex items-center justify-center border border-pink-950 text-pink-500/40 text-[10px] text-center px-1">
-                        Sin imagen
-                      </div>
-                    )}
+                      ) : (
+                        <div className="w-full h-full bg-[#140005] flex items-center justify-center text-pink-500/40 text-xs font-medium tracking-widest uppercase">
+                          📷 Sin imagen disponible
+                        </div>
+                      )}
+                    </div>
 
-                    <div className="flex-1 flex flex-col justify-between h-full">
+                    {/* DESCRIPCIÓN Y CONTENIDO ABAJO */}
+                    <div className="p-5 flex-1 flex flex-col justify-between">
                       <div>
-                        <h3 className="text-yellow-400 font-extrabold text-sm sm:text-base uppercase tracking-wide mb-1 line-clamp-1">{product.name}</h3>
-                        <p className="text-pink-100/70 text-xs leading-relaxed mb-3 line-clamp-2">{product.description}</p>
+                        <h3 className="text-yellow-400 font-extrabold text-base sm:text-lg uppercase tracking-wide mb-1.5">
+                          {product.name}
+                        </h3>
+                        <p className="text-pink-100/70 text-xs sm:text-sm leading-relaxed mb-4">
+                          {product.description || 'Delicioso plato preparado al momento con los mejores ingredientes.'}
+                        </p>
                       </div>
-                      <div className="flex justify-between items-center pt-2 border-t border-pink-950">
-                        <span className="bg-white text-slate-950 font-black px-2.5 py-1 rounded-xl text-sm shadow-inner">
+
+                      <div className="flex justify-between items-center pt-3 border-t border-pink-950">
+                        <span className="bg-white text-slate-950 font-black px-3 py-1.5 rounded-xl text-base shadow-inner">
                           ${product.price.toFixed(2)}
                         </span>
                         <button 
                           onClick={() => addToCart(product)}
-                          className="bg-[#ff007f] hover:bg-pink-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-md transition active:scale-95 flex items-center gap-1"
+                          className="bg-[#ff007f] hover:bg-pink-600 text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-[#ff007f]/30 transition active:scale-95 flex items-center gap-1.5"
                         >
-                          <span>+ Agregar</span>
+                          <span>+ Agregar al Carrito</span>
                         </button>
                       </div>
                     </div>
+
                   </div>
                 ))}
               </div>
