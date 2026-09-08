@@ -6,7 +6,6 @@ export const dynamic = 'force-dynamic';
 
 async function getProducts() {
   try {
-    // Busca cualquiera de las dos variables para asegurar la conexión de inmediato
     const connectionString = process.env.DATABASE_URL || process.env.SQLITECLOUD_CONNECTION_STRING;
     
     if (!connectionString) {
@@ -15,9 +14,9 @@ async function getProducts() {
     }
 
     const db = new Database(connectionString);
-    const result: any = await db.sql('SELECT id, name, description, price_usd, category FROM products;');
+    // Incluimos image_url en la consulta SQL
+    const result: any = await db.sql('SELECT id, name, description, price_usd, category, image_url FROM products;');
     
-    // Manejo robusto de los formatos de respuesta del driver de SQLite Cloud
     if (Array.isArray(result)) return result;
     if (result && Array.isArray(result.rows)) return result.rows;
     if (result && typeof result === 'object') {
@@ -50,7 +49,8 @@ export default async function TakosushiMenuPage() {
         id: prod.id || Math.random(),
         name: prod.name,
         description: prod.description || '',
-        price: prod.price_usd ? Number(prod.price_usd) : 0
+        price: prod.price_usd ? Number(prod.price_usd) : 0,
+        image: prod.image_url || '' // Pasamos la URL limpia de la imagen
       });
     });
   }
