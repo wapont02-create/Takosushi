@@ -13,7 +13,7 @@ type Product = {
   category: string; 
   taxable: boolean;  
   stock: number;     
-  image?: string;    // Campo de imagen opcional
+  image?: string;    
 };
 
 type CartItem = Product & { quantity: number };
@@ -277,6 +277,10 @@ export default function DashboardPOS() {
   const [activeTab, setActiveTab] = useState<'welcome' | 'pos' | 'inventory' | 'reports' | 'accounts' | 'customers' | 'roles'>('welcome'); 
   
   const [products, setProducts] = useState<Product[]>([]);
+  const [categoriesList, setCategoriesList] = useState<string[]>(['Comida', 'Bebidas', 'COMBOS ESPECIALES', 'ROLLS FAVORITOS']);
+  const [newCategoryInput, setNewCategoryInput] = useState('');
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+
   const [salesHistory, setSalesHistory] = useState<SaleRecord[]>([]);
   const [credits, setCredits] = useState<CreditAccount[]>([]);
   const [payables, setPayables] = useState<PayableAccount[]>([]);
@@ -327,12 +331,63 @@ export default function DashboardPOS() {
   const [newCategory, setNewCategory] = useState('Comida');
   const [newTaxable, setNewTaxable] = useState(true);
   const [newStock, setNewStock] = useState('');
-  const [newImage, setNewImage] = useState(''); // Estado para la URL de la imagen
+  const [newImage, setNewImage] = useState(''); 
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const [lastPrintedSale, setLastPrintedSale] = useState<any>(null);
   const [successModalData, setSuccessModalData] = useState<{ isOpen: boolean; changeUSD: number; changeBs: number; isCredit: boolean; clientName?: string } | null>(null);
 
-  // Consultar estatus de caja sin bloquear todo el panel
+  // Función para subir imagen al servidor externo mediante API
+  const handleImageUploadToExternalAPI = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+
+    const formData = new FormData();
+    formData.append('image', file); // Ajustar el campo según la API externa si requiere otro nombre (ej. 'file', 'photo')
+
+    setIsUploadingImage(true);
+    try {
+      // Ejemplo apuntando a ruta de subida o API externa configurada
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.url || data.success || data.secure_url) {
+        setNewImage(data.url || data.secure_url || data.path);
+        alert('¡Imagen subida al servidor externo con éxito!');
+      } else {
+        alert('Error al subir la imagen: ' + (data.error || 'Respuesta inválida'));
+      }
+    } catch (err) {
+      console.error('Error de red al subir imagen:', err);
+      // Fallback local temporal en caso de prueba si la API externa no está montada localmente
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewImage(reader.result as string);
+        alert('Imagen cargada localmente (Modo Respaldo).');
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  // Función para crear nueva categoría dinámicamente
+  const handleCreateCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryInput.trim()) return;
+    const formattedCat = newCategoryInput.trim().toUpperCase();
+    if (!categoriesList.includes(formattedCat)) {
+      setCategoriesList(prev => [...prev, formattedCat]);
+    }
+    setNewCategory(formattedCat);
+    setNewCategoryInput('');
+    setIsAddingCategory(false);
+    alert(`¡Categoría "${formattedCat}" creada y seleccionada!`);
+  };
+
   const checkCashRegisterStatus = async (onOpenPOS?: boolean) => {
     try {
       const res = await fetch('/api/cash');
@@ -375,7 +430,14 @@ export default function DashboardPOS() {
       try {
         const prodRes = await fetch('/api/products');
         const prodData = await prodRes.json();
-        if (Array.isArray(prodData)) setProducts(prodData);
+        if (Array.isArray(prodData)) {
+          setProducts(prodData);
+          // Extraer categorías únicas de los productos si existen
+          const extractedCats = Array.from(new Set(prodData.map((p: any) => p.category).filter(Boolean)));
+          if (extractedCats.length > 0) {
+            setCategoriesList(prev => Array.from(new Set([...prev, ...extractedCats])) as string[]);
+          }
+        }
 
         const salesRes = await fetch('/api/sales');
         const salesData = await salesRes.json();
@@ -682,7 +744,7 @@ export default function DashboardPOS() {
           category: newCategory,
           taxable: newTaxable,
           stock: parseInt(newStock),
-          image: newImage // Envío de la URL de la imagen al backend
+          image: newImage 
         })
       });
       const data = await res.json();
@@ -752,11 +814,10 @@ export default function DashboardPOS() {
     return matchesSearch && matchesCategory;
   });
 
-  const categories = ['Todos', ...Array.from(new Set(products.map(p => p.category)))];
+  const categories = ['Todos', ...categoriesList];
 
   return (
     <div className="min-h-screen bg-slate-100/60 text-slate-800 flex flex-col relative font-sans">
-      {/* Header / Navbar Enterprise */}
       <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 px-6 py-3 flex flex-wrap justify-between items-center gap-4 shadow-xs">
         <div className="flex items-center gap-4">
           <div className="bg-blue-600 text-white p-2 rounded-2xl font-black text-sm shadow-sm cursor-pointer" onClick={() => handleTabChange('welcome')}>⚡ POS</div>
@@ -769,7 +830,6 @@ export default function DashboardPOS() {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
         <nav className="flex items-center gap-1 bg-slate-100/80 p-1.5 rounded-2xl text-xs font-bold border border-slate-200/50">
           <button onClick={() => handleTabChange('welcome')} className={`px-3.5 py-1.5 rounded-xl transition ${activeTab === 'welcome' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}>
             🏠 Inicio
@@ -806,7 +866,6 @@ export default function DashboardPOS() {
           )}
         </nav>
 
-        {/* User Profile & Shift Controls */}
         <div className="flex items-center gap-3">
           {isCashOpen && (
             <button
@@ -829,10 +888,8 @@ export default function DashboardPOS() {
         </div>
       </header>
 
-      {/* Main Container */}
       <main className="flex-1 p-6 max-w-7xl mx-auto w-full space-y-6">
         
-        {/* PANTALLA DE BIENVENIDA */}
         {activeTab === 'welcome' && (
           <div className="space-y-6 py-6 animate-fadeIn">
             <div className="bg-white border border-slate-200/80 rounded-3xl p-8 shadow-sm text-center space-y-4 max-w-2xl mx-auto">
@@ -890,7 +947,6 @@ export default function DashboardPOS() {
           </div>
         )}
 
-        {/* TAB 1: POS (Con visualización de imágenes de productos) */}
         {activeTab === 'pos' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-4">
@@ -915,7 +971,6 @@ export default function DashboardPOS() {
                 </div>
               </div>
 
-              {/* Product Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
                 {filteredProducts.map(product => (
                   <div
@@ -924,7 +979,6 @@ export default function DashboardPOS() {
                     className={`bg-white border rounded-3xl p-4 flex flex-col justify-between cursor-pointer transition shadow-xs hover:shadow-md ${product.stock <= 0 ? 'opacity-50 border-rose-200 bg-rose-50/20' : 'border-slate-200/80 hover:border-blue-400 hover:-translate-y-0.5'}`}
                   >
                     <div>
-                      {/* Renderizado de la imagen en las tarjetas POS */}
                       {product.image ? (
                         <div className="w-full h-24 mb-2.5 rounded-2xl overflow-hidden bg-slate-100 border border-slate-100">
                           <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
@@ -950,7 +1004,6 @@ export default function DashboardPOS() {
               </div>
             </div>
 
-            {/* Cart Sidebar */}
             <div className="space-y-4">
               <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm space-y-4 flex flex-col h-[calc(100vh-210px)] sticky top-20">
                 <div className="flex justify-between items-center border-b border-slate-100 pb-3">
@@ -1021,7 +1074,7 @@ export default function DashboardPOS() {
           </div>
         )}
 
-        {/* TAB 2: INVENTORY (Con campo de URL de imagen incluido) */}
+        {/* TAB 2: INVENTARIO (Con subida de imagen a servidor externo y creación de categorías) */}
         {activeTab === 'inventory' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1032,11 +1085,22 @@ export default function DashboardPOS() {
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">Nombre *</label>
                     <input type="text" required value={newName} onChange={e => setNewName(e.target.value)} placeholder="Ej. Hamburguesa Doble" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs" />
                   </div>
-                  {/* Campo de entrada para la URL de la imagen */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">URL de la Imagen</label>
-                    <input type="text" value={newImage} onChange={e => setNewImage(e.target.value)} placeholder="https://ejemplo.com/imagen.jpg" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs" />
+                  
+                  {/* Sección para montar imagen y enviarla al servidor externo vía API */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-bold text-slate-600">Imagen del Producto (Servidor Externo)</label>
+                    <div className="flex gap-2 items-center">
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={handleImageUploadToExternalAPI}
+                        className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer bg-slate-50 border border-slate-200 rounded-2xl p-1"
+                      />
+                    </div>
+                    {isUploadingImage && <p className="text-[10px] text-blue-600 animate-pulse font-bold">Subiendo imagen al servidor externo...</p>}
+                    <input type="text" value={newImage} onChange={e => setNewImage(e.target.value)} placeholder="URL externa generada..." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[11px] text-slate-500 shadow-2xs mt-1" />
                   </div>
+
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-[11px] font-bold text-slate-600 mb-1">Costo ($)</label>
@@ -1047,16 +1111,55 @@ export default function DashboardPOS() {
                       <input type="number" step="0.01" required value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="0.00" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Categoría</label>
-                      <input type="text" value={newCategory} onChange={e => setNewCategory(e.target.value)} placeholder="Comida, Bebidas..." className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs" />
+
+                  {/* Sección para selección y creación de categorías */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="block text-[11px] font-bold text-slate-600">Categoría</label>
+                      <button 
+                        type="button" 
+                        onClick={() => setIsAddingCategory(!isAddingCategory)} 
+                        className="text-[10px] text-blue-600 font-bold hover:underline"
+                      >
+                        {isAddingCategory ? 'Cancelar' : '+ Crear Categoría'}
+                      </button>
                     </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Stock Inicial *</label>
-                      <input type="number" required value={newStock} onChange={e => setNewStock(e.target.value)} placeholder="0" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs" />
-                    </div>
+
+                    {isAddingCategory ? (
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          placeholder="Nueva categoría..." 
+                          value={newCategoryInput} 
+                          onChange={e => setNewCategoryInput(e.target.value)} 
+                          className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs shadow-2xs"
+                        />
+                        <button 
+                          type="button" 
+                          onClick={handleCreateCategory}
+                          className="bg-blue-600 text-white px-3 py-2 rounded-xl text-xs font-bold"
+                        >
+                          Añadir
+                        </button>
+                      </div>
+                    ) : (
+                      <select 
+                        value={newCategory} 
+                        onChange={e => setNewCategory(e.target.value)} 
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs font-bold text-slate-800 shadow-2xs"
+                      >
+                        {categoriesList.map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Stock Inicial *</label>
+                    <input type="number" required value={newStock} onChange={e => setNewStock(e.target.value)} placeholder="0" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs" />
+                  </div>
+
                   <div className="flex items-center gap-2 pt-1">
                     <input type="checkbox" id="taxableCheck" checked={newTaxable} onChange={e => setNewTaxable(e.target.checked)} className="rounded text-blue-600" />
                     <label htmlFor="taxableCheck" className="text-xs text-slate-700 font-semibold">Aplica IVA (16%)</label>
@@ -1128,7 +1231,6 @@ export default function DashboardPOS() {
           </div>
         )}
 
-        {/* TAB 3: REPORTS */}
         {activeTab === 'reports' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
@@ -1215,7 +1317,6 @@ export default function DashboardPOS() {
           </div>
         )}
 
-        {/* TAB 4: ACCOUNTS */}
         {activeTab === 'accounts' && (
           <div className="space-y-6">
             <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
@@ -1317,14 +1418,11 @@ export default function DashboardPOS() {
           </div>
         )}
 
-        {/* TAB 5: CUSTOMERS */}
         {activeTab === 'customers' && <CustomersDirectoryModule />}
 
-        {/* TAB 6: ROLES */}
         {activeTab === 'roles' && <RolesManagerModule />}
       </main>
 
-      {/* MODAL DE APERTURA DE CAJA */}
       {showOpenCashModal && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4">
@@ -1353,7 +1451,6 @@ export default function DashboardPOS() {
         </div>
       )}
 
-      {/* MODAL DE ARQUEO Y CIERRE DE CAJA */}
       {showCloseCashModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 animate-scaleUp">
@@ -1377,7 +1474,6 @@ export default function DashboardPOS() {
         </div>
       )}
 
-      {/* Checkout Modal */}
       {isCheckoutModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-scaleUp">
@@ -1425,7 +1521,6 @@ export default function DashboardPOS() {
         </div>
       )}
 
-      {/* Restock Modal */}
       {isRestockModalOpen && selectedProductForRestock && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 animate-scaleUp">
@@ -1442,7 +1537,6 @@ export default function DashboardPOS() {
         </div>
       )}
 
-      {/* Success / Receipt Modal */}
       {successModalData && successModalData.isOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 text-center animate-scaleUp">
