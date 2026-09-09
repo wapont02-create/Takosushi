@@ -728,6 +728,13 @@ export default function DashboardPOS() {
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newPrice || !newStock) return;
+
+    // Validación para evitar guardar si la imagen sigue cargando
+    if (isUploadingImage) {
+      alert('Por favor espere a que termine de subir la imagen a ImgBB.');
+      return;
+    }
+
     try {
       const res = await fetch('/api/products', {
         method: 'POST',
@@ -1157,7 +1164,14 @@ export default function DashboardPOS() {
                     <input type="checkbox" id="taxableCheck" checked={newTaxable} onChange={e => setNewTaxable(e.target.checked)} className="rounded text-blue-600" />
                     <label htmlFor="taxableCheck" className="text-xs text-slate-700 font-semibold">Aplica IVA (16%)</label>
                   </div>
-                  <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-2xl text-xs shadow-sm mt-2 transition">Guardar Producto 💾</button>
+
+                  <button 
+                    type="submit" 
+                    disabled={isUploadingImage}
+                    className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-3 rounded-2xl text-xs shadow-sm mt-2 transition"
+                  >
+                    {isUploadingImage ? 'Subiendo imagen...' : 'Guardar Producto 💾'}
+                  </button>
                 </form>
               </div>
 
