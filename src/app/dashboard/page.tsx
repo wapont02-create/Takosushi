@@ -818,7 +818,7 @@ export default function DashboardPOS() {
 
   return (
     <div className="min-h-screen bg-slate-100/60 text-slate-800 flex flex-col relative font-sans">
-      <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 px-6 py-3 flex flex-wrap justify-between items-center gap-4 shadow-xs">
+      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 px-6 py-3 flex flex-wrap justify-between items-center gap-4 shadow-xs">
         <div className="flex items-center gap-4">
           <div className="bg-blue-600 text-white p-2 rounded-2xl font-black text-sm shadow-sm cursor-pointer" onClick={() => handleTabChange('welcome')}>⚡ POS</div>
           <div>
@@ -1074,7 +1074,6 @@ export default function DashboardPOS() {
           </div>
         )}
 
-        {/* TAB 2: INVENTARIO (Con subida de imagen a servidor externo y creación de categorías) */}
         {activeTab === 'inventory' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1086,7 +1085,6 @@ export default function DashboardPOS() {
                     <input type="text" required value={newName} onChange={e => setNewName(e.target.value)} placeholder="Ej. Hamburguesa Doble" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs" />
                   </div>
                   
-                  {/* Sección para montar imagen y enviarla al servidor externo vía API */}
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-bold text-slate-600">Imagen del Producto (Servidor Externo)</label>
                     <div className="flex gap-2 items-center">
@@ -1112,7 +1110,6 @@ export default function DashboardPOS() {
                     </div>
                   </div>
 
-                  {/* Sección para selección y creación de categorías */}
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
                       <label className="block text-[11px] font-bold text-slate-600">Categoría</label>
