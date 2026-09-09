@@ -332,47 +332,48 @@ export default function DashboardPOS() {
   const [newTaxable, setNewTaxable] = useState(true);
   const [newStock, setNewStock] = useState('');
   const [newImage, setNewImage] = useState(''); 
+  const [selectedFileName, setSelectedFileName] = useState('');
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const [lastPrintedSale, setLastPrintedSale] = useState<any>(null);
   const [successModalData, setSuccessModalData] = useState<{ isOpen: boolean; changeUSD: number; changeBs: number; isCredit: boolean; clientName?: string } | null>(null);
 
-  // Función para subir imagen al servidor externo mediante API[cite: 6]
-  const handleImageUploadToExternalAPI = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Función para subir imagen directamente a ImgBB mediante API
+  const handleImageUploadToImgBB = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
 
+    setSelectedFileName(file.name);
+    setIsUploadingImage(true);
+
+    const apiKey = "1c62ff9f688a221f7ee6b5c0c660f5e1"; // Reemplaza o mantén tu API Key de ImgBB
     const formData = new FormData();
     formData.append('image', file);
 
-    setIsUploadingImage(true);
     try {
-      const res = await fetch('/api/upload', {
+      const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
         method: 'POST',
-        body: formData
+        body: formData,
       });
-      const data = await res.json();
-      if (data.url || data.success || data.secure_url) {
-        setNewImage(data.url || data.secure_url || data.path);
-        alert('¡Imagen subida al servidor externo con éxito!');
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setNewImage(data.data.url);
+        alert('¡Imagen subida a ImgBB con éxito!');
       } else {
-        alert('Error al subir la imagen: ' + (data.error || 'Respuesta inválida'));
+        alert('Error al subir la imagen a ImgBB');
       }
-    } catch (err) {
-      console.error('Error de red al subir imagen:', err);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewImage(reader.result as string);
-        alert('Imagen cargada localmente (Modo Respaldo).');
-      };
-      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Error:", error);
+      alert('Error de red al conectar con ImgBB.');
     } finally {
       setIsUploadingImage(false);
     }
   };
 
-  // Función para crear nueva categoría dinámicamente[cite: 6]
+  // Función para crear nueva categoría dinámicamente
   const handleCreateCategory = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCategoryInput.trim()) return;
@@ -747,7 +748,7 @@ export default function DashboardPOS() {
       const data = await res.json();
       if (data.success || res.ok) {
         alert('¡Producto creado exitosamente!');
-        setNewName(''); setNewCostPrice(''); setNewPrice(''); setNewStock(''); setNewImage(''); 
+        setNewName(''); setNewCostPrice(''); setNewPrice(''); setNewStock(''); setNewImage(''); setSelectedFileName('');
         const prodRes = await fetch('/api/products');
         const prodData = await prodRes.json();
         if (Array.isArray(prodData)) setProducts(prodData);
@@ -1071,7 +1072,7 @@ export default function DashboardPOS() {
           </div>
         )}
 
-        {/* TAB 2: INVENTARIO (Con subida de imagen a servidor externo y creación de categorías) */}
+        {/* TAB 2: INVENTARIO (Con subida de imagen a ImgBB y creación de categorías) */}
         {activeTab === 'inventory' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1083,19 +1084,20 @@ export default function DashboardPOS() {
                     <input type="text" required value={newName} onChange={e => setNewName(e.target.value)} placeholder="Ej. Hamburguesa Doble" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs" />
                   </div>
                   
-                  {/* Sección para montar imagen y enviarla al servidor externo vía API[cite: 6] */}
+                  {/* Sección para cargar imagen a ImgBB y mostrar nombre de archivo limpio */}
                   <div className="space-y-1.5">
-                    <label className="block text-[11px] font-bold text-slate-600">Imagen del Producto (Servidor Externo)</label>
+                    <label className="block text-[11px] font-bold text-slate-600">Imagen del Producto (ImgBB)</label>
                     <div className="flex gap-2 items-center">
                       <input 
                         type="file" 
                         accept="image/*"
-                        onChange={handleImageUploadToExternalAPI}
+                        onChange={handleImageUploadToImgBB}
                         className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer bg-slate-50 border border-slate-200 rounded-2xl p-1"
                       />
                     </div>
-                    {isUploadingImage && <p className="text-[10px] text-blue-600 animate-pulse font-bold">Subiendo imagen al servidor externo...</p>}
-                    <input type="text" value={newImage} onChange={e => setNewImage(e.target.value)} placeholder="URL externa generada..." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[11px] text-slate-500 shadow-2xs mt-1" />
+                    {selectedFileName && <p className="text-[10px] text-slate-500 font-semibold">Archivo: {selectedFileName}</p>}
+                    {isUploadingImage && <p className="text-[10px] text-blue-600 animate-pulse font-bold">Subiendo imagen a ImgBB...</p>}
+                    {newImage && <p className="text-[10px] text-emerald-600 font-bold truncate">URL ImgBB: {newImage}</p>}
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
@@ -1109,7 +1111,7 @@ export default function DashboardPOS() {
                     </div>
                   </div>
 
-                  {/* Sección para selección y creación de categorías[cite: 6] */}
+                  {/* Sección para selección y creación de categorías */}
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
                       <label className="block text-[11px] font-bold text-slate-600">Categoría</label>
