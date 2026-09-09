@@ -337,18 +337,17 @@ export default function DashboardPOS() {
   const [lastPrintedSale, setLastPrintedSale] = useState<any>(null);
   const [successModalData, setSuccessModalData] = useState<{ isOpen: boolean; changeUSD: number; changeBs: number; isCredit: boolean; clientName?: string } | null>(null);
 
-  // Función para subir imagen al servidor externo mediante API
+  // Función para subir imagen al servidor externo mediante API[cite: 6]
   const handleImageUploadToExternalAPI = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
 
     const formData = new FormData();
-    formData.append('image', file); // Ajustar el campo según la API externa si requiere otro nombre (ej. 'file', 'photo')
+    formData.append('image', file);
 
     setIsUploadingImage(true);
     try {
-      // Ejemplo apuntando a ruta de subida o API externa configurada
       const res = await fetch('/api/upload', {
         method: 'POST',
         body: formData
@@ -362,7 +361,6 @@ export default function DashboardPOS() {
       }
     } catch (err) {
       console.error('Error de red al subir imagen:', err);
-      // Fallback local temporal en caso de prueba si la API externa no está montada localmente
       const reader = new FileReader();
       reader.onloadend = () => {
         setNewImage(reader.result as string);
@@ -374,7 +372,7 @@ export default function DashboardPOS() {
     }
   };
 
-  // Función para crear nueva categoría dinámicamente
+  // Función para crear nueva categoría dinámicamente[cite: 6]
   const handleCreateCategory = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCategoryInput.trim()) return;
@@ -432,7 +430,6 @@ export default function DashboardPOS() {
         const prodData = await prodRes.json();
         if (Array.isArray(prodData)) {
           setProducts(prodData);
-          // Extraer categorías únicas de los productos si existen
           const extractedCats = Array.from(new Set(prodData.map((p: any) => p.category).filter(Boolean)));
           if (extractedCats.length > 0) {
             setCategoriesList(prev => Array.from(new Set([...prev, ...extractedCats])) as string[]);
@@ -818,7 +815,7 @@ export default function DashboardPOS() {
 
   return (
     <div className="min-h-screen bg-slate-100/60 text-slate-800 flex flex-col relative font-sans">
-      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 px-6 py-3 flex flex-wrap justify-between items-center gap-4 shadow-xs">
+      <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 px-6 py-3 flex flex-wrap justify-between items-center gap-4 shadow-xs">
         <div className="flex items-center gap-4">
           <div className="bg-blue-600 text-white p-2 rounded-2xl font-black text-sm shadow-sm cursor-pointer" onClick={() => handleTabChange('welcome')}>⚡ POS</div>
           <div>
@@ -1074,6 +1071,7 @@ export default function DashboardPOS() {
           </div>
         )}
 
+        {/* TAB 2: INVENTARIO (Con subida de imagen a servidor externo y creación de categorías) */}
         {activeTab === 'inventory' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1085,6 +1083,7 @@ export default function DashboardPOS() {
                     <input type="text" required value={newName} onChange={e => setNewName(e.target.value)} placeholder="Ej. Hamburguesa Doble" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs" />
                   </div>
                   
+                  {/* Sección para montar imagen y enviarla al servidor externo vía API[cite: 6] */}
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-bold text-slate-600">Imagen del Producto (Servidor Externo)</label>
                     <div className="flex gap-2 items-center">
@@ -1110,6 +1109,7 @@ export default function DashboardPOS() {
                     </div>
                   </div>
 
+                  {/* Sección para selección y creación de categorías[cite: 6] */}
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
                       <label className="block text-[11px] font-bold text-slate-600">Categoría</label>
