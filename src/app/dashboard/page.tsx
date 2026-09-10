@@ -337,7 +337,6 @@ export default function DashboardPOS() {
   const [lastPrintedSale, setLastPrintedSale] = useState<any>(null);
   const [successModalData, setSuccessModalData] = useState<{ isOpen: boolean; changeUSD: number; changeBs: number; isCredit: boolean; clientName?: string } | null>(null);
 
-  // NUEVA FUNCIÓN ACTUALIZADA: Conexión segura con el endpoint interno /api/upload
   const handleImageUploadToImgBB = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -1079,7 +1078,6 @@ export default function DashboardPOS() {
                     <input type="text" required value={newName} onChange={e => setNewName(e.target.value)} placeholder="Ej. Hamburguesa Doble" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs" />
                   </div>
                   
-                  {/* SECCIÓN MEJORADA DE SUBIDA DE IMAGEN CON VISTA PREVIA */}
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-bold text-slate-600">Imagen del Producto (ImgBB)</label>
                     
