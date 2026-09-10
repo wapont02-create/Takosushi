@@ -359,7 +359,6 @@ export default function DashboardPOS() {
       
       if (data.success) {
         setNewImage(data.data.url);
-        alert('¡Imagen subida a ImgBB con éxito!');
       } else {
         alert('Error al subir la imagen a ImgBB');
       }
@@ -728,13 +727,6 @@ export default function DashboardPOS() {
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newPrice || !newStock) return;
-
-    // Validación para evitar guardar si la imagen sigue cargando
-    if (isUploadingImage) {
-      alert('Por favor espere a que termine de subir la imagen a ImgBB.');
-      return;
-    }
-
     try {
       const res = await fetch('/api/products', {
         method: 'POST',
@@ -1087,19 +1079,44 @@ export default function DashboardPOS() {
                     <input type="text" required value={newName} onChange={e => setNewName(e.target.value)} placeholder="Ej. Hamburguesa Doble" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs" />
                   </div>
                   
+                  {/* SECCIÓN MEJORADA DE SUBIDA DE IMAGEN CON VISTA PREVIA */}
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-bold text-slate-600">Imagen del Producto (ImgBB)</label>
-                    <div className="flex gap-2 items-center">
-                      <input 
-                        type="file" 
-                        accept="image/*"
-                        onChange={handleImageUploadToImgBB}
-                        className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer bg-slate-50 border border-slate-200 rounded-2xl p-1"
-                      />
-                    </div>
-                    {selectedFileName && <p className="text-[10px] text-slate-500 font-semibold">Archivo: {selectedFileName}</p>}
-                    {isUploadingImage && <p className="text-[10px] text-blue-600 animate-pulse font-bold">Subiendo imagen a ImgBB...</p>}
-                    {newImage && <p className="text-[10px] text-emerald-600 font-bold truncate">URL ImgBB: {newImage}</p>}
+                    
+                    {newImage ? (
+                      <div className="relative w-full h-32 rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center group">
+                        <img src={newImage} alt="Vista previa" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { setNewImage(''); setSelectedFileName(''); }}
+                            className="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow"
+                          >
+                            Eliminar 🗑️
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-2xl p-4 text-center bg-slate-50/50 transition cursor-pointer relative">
+                        <input 
+                          type="file" 
+                          accept="image/*"
+                          onChange={handleImageUploadToImgBB}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        />
+                        <div className="space-y-1">
+                          <span className="text-xl">📷</span>
+                          <p className="text-xs font-bold text-slate-700">Haz clic para subir o arrastra una imagen</p>
+                          <p className="text-[10px] text-slate-400">PNG, JPG o WEBP</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {isUploadingImage && (
+                      <div className="flex items-center gap-2 text-blue-600 text-[11px] font-bold animate-pulse pt-1">
+                        <span className="inline-block animate-spin">⏳</span> Subiendo imagen a ImgBB...
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
@@ -1164,14 +1181,7 @@ export default function DashboardPOS() {
                     <input type="checkbox" id="taxableCheck" checked={newTaxable} onChange={e => setNewTaxable(e.target.checked)} className="rounded text-blue-600" />
                     <label htmlFor="taxableCheck" className="text-xs text-slate-700 font-semibold">Aplica IVA (16%)</label>
                   </div>
-
-                  <button 
-                    type="submit" 
-                    disabled={isUploadingImage}
-                    className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-3 rounded-2xl text-xs shadow-sm mt-2 transition"
-                  >
-                    {isUploadingImage ? 'Subiendo imagen...' : 'Guardar Producto 💾'}
-                  </button>
+                  <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-2xl text-xs shadow-sm mt-2 transition">Guardar Producto 💾</button>
                 </form>
               </div>
 
