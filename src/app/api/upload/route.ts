@@ -3,35 +3,48 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request) {
   try {
     const data = await request.formData();
-    const file = data.get('image') as File | null;
+    const file = data.get('image') as File;
 
     if (!file) {
-      return NextResponse.json({ success: false, error: 'No se encontró la imagen' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'No se ha proporcionado ninguna imagen.' }, { status: 400 });
     }
 
-    // Convertimos el archivo a ArrayBuffer y luego a Blob para asegurar compatibilidad en Node.js
+    const apiKey = process.env.IMGBB_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ success: false, error: 'Falta configurar la IMGBB_API_KEY en las variables de entorno.' }, { status: 500 });
+    }
+
+    // Convertir el archivo a buffer y luego a base64 para enviarlo de forma segura a ImgBB
     const bytes = await file.arrayBuffer();
-    const blob = new Blob([bytes], { type: file.type });
+    const buffer = Buffer.from(bytes);
+    const base64Image = buffer.toString('base64');
 
-    const apiKey = "1c62ff9f688a221f7ee6b5c0c660f5e1";
-    const imgbbFormData = new FormData();
-    imgbbFormData.append('image', blob, file.name);
+    // Preparar los datos para la API de ImgBB
+    const body = new URLSearchParams();
+    body.append('key', apiKey);
+    body.append('image', base64Image);
 
-    const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+    const imgbbResponse = await fetch('https://api.imgbb.com/1/upload', {
       method: 'POST',
-      body: imgbbFormData,
+      body: body,
     });
 
-    const result = await response.json();
+    const result = await imgbbResponse.json();
 
-    if (result.success) {
-      return NextResponse.json({ success: true, url: result.data.url });
+    if (result && result.success) {
+      return NextResponse.json({
+        success: true,
+        url: result.data.url, // URL pública de la imagen
+      });
     } else {
-      console.error('Respuesta de ImgBB:', result);
-      return NextResponse.json({ success: false, error: 'Error en la respuesta de ImgBB' }, { status: 400 });
+      return NextResponse.json({
+        success: false,
+        error: result.error?.message || 'Error desconocido por parte de ImgBB',
+      }, { status: 400 });
     }
+
   } catch (error) {
-    console.error('Error al subir imagen:', error);
-    return NextResponse.json({ success: false, error: 'Error interno del servidor' }, { status: 500 });
+    console.error('Error interno en /api/upload:', error);
+    return NextResponse.json({ success: false, error: 'Error interno del servidor al procesar la imagen.' }, { status: 500 });
   }
 }
