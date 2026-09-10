@@ -337,6 +337,7 @@ export default function DashboardPOS() {
   const [lastPrintedSale, setLastPrintedSale] = useState<any>(null);
   const [successModalData, setSuccessModalData] = useState<{ isOpen: boolean; changeUSD: number; changeBs: number; isCredit: boolean; clientName?: string } | null>(null);
 
+  // NUEVA FUNCIÓN ACTUALIZADA: Conexión segura con el endpoint interno /api/upload
   const handleImageUploadToImgBB = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -345,12 +346,11 @@ export default function DashboardPOS() {
     setSelectedFileName(file.name);
     setIsUploadingImage(true);
 
-    const apiKey = "1c62ff9f688a221f7ee6b5c0c660f5e1";
     const formData = new FormData();
     formData.append('image', file);
 
     try {
-      const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+      const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       });
@@ -358,13 +358,13 @@ export default function DashboardPOS() {
       const data = await response.json();
       
       if (data.success) {
-        setNewImage(data.data.url);
+        setNewImage(data.url);
       } else {
-        alert('Error al subir la imagen a ImgBB');
+        alert('Error al subir la imagen: ' + (data.error || 'Desconocido'));
       }
     } catch (error) {
       console.error("Error:", error);
-      alert('Error de red al conectar con ImgBB.');
+      alert('Error de red al conectar con el servidor.');
     } finally {
       setIsUploadingImage(false);
     }
