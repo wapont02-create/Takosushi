@@ -795,7 +795,6 @@ export default function DashboardPOS() {
     }
   };
 
-  // Funciones para Editar y Borrar Productos
   const openEditModal = (product: Product) => {
     setEditingProduct(product);
     setEditName(product.name);
