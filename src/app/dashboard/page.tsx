@@ -303,6 +303,16 @@ export default function DashboardPOS() {
   const [selectedProductForRestock, setSelectedProductForRestock] = useState<Product | null>(null);
   const [restockAmount, setRestockAmount] = useState('');
 
+  // Estados para Editar Producto
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editPrice, setEditPrice] = useState('');
+  const [editCostPrice, setEditCostPrice] = useState('');
+  const [editStock, setEditStock] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editImage, setEditImage] = useState('');
+
   const [inventoryFilterMode, setInventoryFilterMode] = useState<'all' | 'low'>('all');
   const [reportFilterPeriod, setReportFilterPeriod] = useState<'all' | 'today' | 'week' | 'month'>('all');
 
@@ -337,12 +347,12 @@ export default function DashboardPOS() {
   const [lastPrintedSale, setLastPrintedSale] = useState<any>(null);
   const [successModalData, setSuccessModalData] = useState<{ isOpen: boolean; changeUSD: number; changeBs: number; isCredit: boolean; clientName?: string } | null>(null);
 
-  const handleImageUploadToImgBB = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUploadToImgBB = async (e: React.ChangeEvent<HTMLInputElement>, isEditMode = false) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
 
-    setSelectedFileName(file.name);
+    if (!isEditMode) setSelectedFileName(file.name);
     setIsUploadingImage(true);
 
     const formData = new FormData();
@@ -357,7 +367,11 @@ export default function DashboardPOS() {
       const data = await response.json();
       
       if (data.success) {
-        setNewImage(data.url);
+        if (isEditMode) {
+          setEditImage(data.url);
+        } else {
+          setNewImage(data.url);
+        }
       } else {
         alert('Error al subir la imagen: ' + (data.error || 'Desconocido'));
       }
@@ -781,6 +795,75 @@ export default function DashboardPOS() {
     }
   };
 
+  // Funciones para Editar y Borrar Productos
+  const openEditModal = (product: Product) => {
+    setEditingProduct(product);
+    setEditName(product.name);
+    setEditPrice(product.price.toString());
+    setEditCostPrice(product.costPrice ? product.costPrice.toString() : '');
+    setEditStock(product.stock.toString());
+    setEditCategory(product.category);
+    setEditImage(product.image || '');
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct || !editName || !editPrice || !editStock) return;
+
+    try {
+      const res = await fetch(`/api/products/${editingProduct.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...editingProduct,
+          name: editName,
+          price: parseFloat(editPrice),
+          costPrice: parseFloat(editCostPrice || '0'),
+          stock: parseInt(editStock),
+          category: editCategory,
+          image: editImage
+        })
+      });
+
+      if (res.ok) {
+        alert('¡Producto actualizado con éxito!');
+        setIsEditModalOpen(false);
+        setEditingProduct(null);
+        const prodRes = await fetch('/api/products');
+        const prodData = await prodRes.json();
+        if (Array.isArray(prodData)) setProducts(prodData);
+      } else {
+        alert('Error al actualizar el producto.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error de red al actualizar.');
+    }
+  };
+
+  const handleDeleteProduct = async (productId: number, productName: string) => {
+    if (!confirm(`¿Estás seguro de que deseas eliminar el producto "${productName}"?`)) return;
+
+    try {
+      const res = await fetch(`/api/products/${productId}`, {
+        method: 'DELETE'
+      });
+
+      if (res.ok) {
+        alert('¡Producto eliminado correctamente!');
+        const prodRes = await fetch('/api/products');
+        const prodData = await prodRes.json();
+        if (Array.isArray(prodData)) setProducts(prodData);
+      } else {
+        alert('No se pudo eliminar el producto.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error de red al eliminar.');
+    }
+  };
+
   const handleAddPayable = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProviderName || !newPayableAmountUSD) return;
@@ -811,7 +894,7 @@ export default function DashboardPOS() {
 
   return (
     <div className="min-h-screen bg-slate-100/60 text-slate-800 flex flex-col relative font-sans">
-      <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 px-6 py-3 flex flex-wrap justify-between items-center gap-4 shadow-xs">
+      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 px-6 py-3 flex flex-wrap justify-between items-center gap-4 shadow-xs">
         <div className="flex items-center gap-4">
           <div className="bg-blue-600 text-white p-2 rounded-2xl font-black text-sm shadow-sm cursor-pointer" onClick={() => handleTabChange('welcome')}>⚡ POS</div>
           <div>
@@ -1099,7 +1182,7 @@ export default function DashboardPOS() {
                         <input 
                           type="file" 
                           accept="image/*"
-                          onChange={handleImageUploadToImgBB}
+                          onChange={(e) => handleImageUploadToImgBB(e, false)}
                           className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                         />
                         <div className="space-y-1">
@@ -1218,12 +1301,29 @@ export default function DashboardPOS() {
                             </span>
                           </td>
                           <td className="p-3 text-right">
-                            <button
-                              onClick={() => { setSelectedProductForRestock(p); setIsRestockModalOpen(true); }}
-                              className="bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold px-3 py-1.5 rounded-xl transition"
-                            >
-                              Reponer ➕
-                            </button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => { setSelectedProductForRestock(p); setIsRestockModalOpen(true); }}
+                                className="bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold px-2.5 py-1.5 rounded-xl transition"
+                                title="Reponer stock"
+                              >
+                                Reponer ➕
+                              </button>
+                              <button
+                                onClick={() => openEditModal(p)}
+                                className="bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold px-2.5 py-1.5 rounded-xl transition"
+                                title="Editar producto"
+                              >
+                                ✏️ Editar
+                              </button>
+                              <button
+                                onClick={() => handleDeleteProduct(p.id, p.name)}
+                                className="bg-rose-50 text-rose-600 hover:bg-rose-100 font-bold px-2.5 py-1.5 rounded-xl transition"
+                                title="Eliminar producto"
+                              >
+                                🗑️
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1546,6 +1646,61 @@ export default function DashboardPOS() {
               <div className="flex gap-2">
                 <button type="button" onClick={() => setIsRestockModalOpen(false)} className="flex-1 bg-slate-100 py-3 rounded-2xl text-xs font-bold text-slate-600">Cancelar</button>
                 <button type="submit" className="flex-1 bg-blue-600 text-white py-3 rounded-2xl text-xs font-bold shadow-sm">Actualizar ➕</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Editar Producto */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-scaleUp max-h-[90vh] overflow-y-auto">
+            <h3 className="text-base font-extrabold text-slate-800">✏️ Editar Producto</h3>
+            <form onSubmit={handleUpdateProduct} className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Nombre *</label>
+                <input type="text" required value={editName} onChange={e => setEditName(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs" />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-slate-600">Imagen del Producto</label>
+                {editImage ? (
+                  <div className="relative w-full h-28 rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center group">
+                    <img src={editImage} alt="Vista previa" className="w-full h-full object-cover" />
+                    <button type="button" onClick={() => setEditImage('')} className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold bg-rose-600/80">Quitar imagen</button>
+                  </div>
+                ) : (
+                  <input type="file" accept="image/*" onChange={(e) => handleImageUploadToImgBB(e, true)} className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Costo ($)</label>
+                  <input type="number" step="0.01" value={editCostPrice} onChange={e => setEditCostPrice(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Precio Venta ($) *</label>
+                  <input type="number" step="0.01" required value={editPrice} onChange={e => setEditPrice(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Categoría</label>
+                <select value={editCategory} onChange={e => setEditCategory(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs font-bold text-slate-800 shadow-2xs">
+                  {categoriesList.map(cat => (<option key={cat} value={cat}>{cat}</option>))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Stock Actual *</label>
+                <input type="number" required value={editStock} onChange={e => setEditStock(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs" />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setIsEditModalOpen(false)} className="flex-1 bg-slate-100 py-3 rounded-2xl text-xs font-bold text-slate-600">Cancelar</button>
+                <button type="submit" className="flex-1 bg-blue-600 text-white py-3 rounded-2xl text-xs font-bold shadow-sm">Guardar Cambios ✓</button>
               </div>
             </form>
           </div>
