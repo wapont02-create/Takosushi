@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import RolesManagerModule from '../../components/RolesManagerModule';
-import ReceiptTicket from '../../components/ReceiptTicket';
 import { getRoles, getUsers } from '../../utils/rolesManager';
 import {
   LineChart,
@@ -81,6 +80,18 @@ type PayableAccount = {
 
 const IVA_RATE = 0.16;
 
+async function readJson<T = any>(response: Response): Promise<T> {
+  const text = await response.text();
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(
+      `Respuesta inválida del servidor (${response.status}): ${text.slice(0, 200)}`
+    );
+  }
+}
+
 /* ============================================================
    SELECTOR DE CLIENTES
 ============================================================ */
@@ -142,7 +153,7 @@ function POSCustomerSelector({
         })
       });
 
-      const data = await res.json();
+      const data = await readJson(res);
 
       if (data.success) {
         onSelectCustomer({
@@ -312,7 +323,7 @@ function CustomersDirectoryModule() {
         })
       });
 
-      const data = await res.json();
+      const data = await readJson(res);
 
       if (data.success) {
         alert('¡Cliente guardado con éxito!');
@@ -497,7 +508,15 @@ export default function DashboardPOS() {
     useState<number>(778.33);
 
   const [currentUsername, setCurrentUsername] =
-    useState<string>('admin');
+    useState<string>('');
+
+  // Usuario autenticado: viene de /login -> localStorage.pos_user.
+  // Este ID es la única identidad autorizada para caja y ventas.
+  const [authenticatedUser, setAuthenticatedUser] =
+    useState<any>(null);
+
+  const authenticatedUserId =
+    Number(authenticatedUser?.id) || null;
 
   const [rolesList, setRolesList] =
     useState(getRoles());
@@ -767,24 +786,14 @@ export default function DashboardPOS() {
   ============================================================ */
 
   const currentUserObj =
-    usersList.find((u: any) => {
-      const username = String(
-        u.username ?? ''
-      ).toLowerCase();
-
-      const name = String(
-        u.name ?? ''
-      ).toLowerCase();
-
-      const current = String(
-        currentUsername ?? ''
-      ).toLowerCase();
-
-      return (
-        username === current ||
-        name === current
-      );
-    }) || usersList[0];
+    (authenticatedUserId
+      ? usersList.find(
+          (u: any) =>
+            Number(u?.id) === authenticatedUserId
+        )
+      : undefined) ||
+    authenticatedUser ||
+    usersList[0];
 
   const currentRoleObj =
     rolesList.find((r: any) => {
@@ -819,9 +828,7 @@ export default function DashboardPOS() {
     onOpenPOS = false
   ) => {
     try {
-      const userId = Number(
-        currentUserObj?.id
-      );
+      const userId = authenticatedUserId;
 
       if (
         !Number.isInteger(userId) ||
@@ -842,7 +849,7 @@ export default function DashboardPOS() {
         }
       );
 
-      const data = await res.json();
+      const data = await readJson(res);
 
       if (
         data.success &&
@@ -888,7 +895,42 @@ export default function DashboardPOS() {
   }, []);
 
   useEffect(() => {
-    if (!isMounted) return;
+    if (!isMounted || typeof window === 'undefined') return;
+
+    try {
+      const savedUser =
+        localStorage.getItem('pos_user');
+
+      if (!savedUser) return;
+
+      const parsedUser = JSON.parse(savedUser);
+      const userId = Number(parsedUser?.id);
+
+      if (
+        !Number.isInteger(userId) ||
+        userId <= 0
+      ) {
+        console.error('pos_user no contiene un ID válido:', parsedUser);
+        return;
+      }
+
+      setAuthenticatedUser({
+        ...parsedUser,
+        id: userId
+      });
+
+      setCurrentUsername(
+        parsedUser?.name ||
+        parsedUser?.email ||
+        ''
+      );
+    } catch (error) {
+      console.error('Error leyendo pos_user:', error);
+    }
+  }, [isMounted]);
+
+  useEffect(() => {
+    if (!isMounted || !authenticatedUserId) return;
 
     checkCashRegisterStatus(false);
 
@@ -931,7 +973,7 @@ export default function DashboardPOS() {
         }
       }
     }
-  }, [isMounted]);
+  }, [isMounted, authenticatedUserId]);
 
   /* ============================================================
      SINCRONIZAR DATOS CLOUD
@@ -1096,9 +1138,7 @@ export default function DashboardPOS() {
   ) => {
     if (tab === 'pos') {
       try {
-        const userId = Number(
-          currentUserObj?.id
-        );
+        const userId = authenticatedUserId;
 
         if (
           !Number.isInteger(userId) ||
@@ -1166,8 +1206,7 @@ export default function DashboardPOS() {
     const bs =
       Number(openingBs || 0);
 
-    const userId =
-      Number(currentUserObj?.id);
+    const userId = authenticatedUserId;
 
     if (
       !Number.isInteger(userId) ||
@@ -1493,8 +1532,7 @@ export default function DashboardPOS() {
        VALIDAR USUARIO
     ======================================================== */
 
-    const userId =
-      Number(currentUserObj?.id);
+    const userId = authenticatedUserId;
 
     if (
       !Number.isInteger(userId) ||
@@ -1537,7 +1575,7 @@ export default function DashboardPOS() {
         );
 
       const cashData =
-        await cashRes.json();
+        await readJson(cashRes);
 
       if (
         !cashRes.ok ||
@@ -1650,6 +1688,10 @@ export default function DashboardPOS() {
 
         /* IMPORTANTE */
         cashRegisterId:
+          databaseRegisterId,
+
+        // /api/sales usa este nombre como campo principal.
+        cash_register_id:
           databaseRegisterId,
 
         userId
@@ -1797,7 +1839,7 @@ export default function DashboardPOS() {
       const prodData =
         await prodRes.json();
 
-      if (
+if (
         Array.isArray(
           prodData
         )
@@ -3599,1846 +3641,548 @@ export default function DashboardPOS() {
                             </td>
 
                             <td className="p-3 text-slate-500">
-                              {
-                                p.category
-                              }
+                              {p.category}
                             </td>
 
-                            <td className="p-3 font-extrabold text-slate-900">
-                              $
-                              {p.price.toFixed(
-                                2
-                              )}
+                            <td className="p-3 font-bold text-slate-800">
+                              ${p.price.toFixed(2)}
                             </td>
 
-                            <td className="p-3">
-
-                              <span
-                                className={`px-2.5 py-1 rounded-lg font-bold ${
-                                  p.stock >
-                                  5
-                                    ? 'bg-emerald-50 text-emerald-700'
-                                    : 'bg-amber-50 text-amber-700'
-                                }`}
-                              >
-                                {
-                                  p.stock
-                                }{' '}
-                                unids.
-                              </span>
-
+                            <td className={`p-3 font-bold ${p.stock <= 5 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                              {p.stock}
                             </td>
 
                             <td className="p-3 text-right">
-
-                              <div className="flex items-center justify-end gap-1.5">
-
+                              <div className="flex justify-end gap-1.5 flex-wrap">
                                 <button
+                                  type="button"
                                   onClick={() => {
-                                    setSelectedProductForRestock(
-                                      p
-                                    );
-
-                                    setIsRestockModalOpen(
-                                      true
-                                    );
+                                    setSelectedProductForRestock(p);
+                                    setRestockAmount('');
+                                    setIsRestockModalOpen(true);
                                   }}
-                                  className="bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold px-2.5 py-1.5 rounded-xl transition"
+                                  className="px-2.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg font-bold hover:bg-emerald-100"
                                 >
-                                  Reponer ➕
+                                  + Stock
                                 </button>
-
                                 <button
-                                  onClick={() =>
-                                    openEditModal(
-                                      p
-                                    )
-                                  }
-                                  className="bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold px-2.5 py-1.5 rounded-xl transition"
+                                  type="button"
+                                  onClick={() => openEditModal(p)}
+                                  className="px-2.5 py-1.5 bg-blue-50 text-blue-700 rounded-lg font-bold hover:bg-blue-100"
                                 >
-                                  ✏️ Editar
+                                  Editar
                                 </button>
-
                                 <button
-                                  onClick={() =>
-                                    handleDeleteProduct(
-                                      p.id,
-                                      p.name
-                                    )
-                                  }
-                                  className="bg-rose-50 text-rose-600 hover:bg-rose-100 font-bold px-2.5 py-1.5 rounded-xl transition"
+                                  type="button"
+                                  onClick={() => handleDeleteProduct(p.id, p.name)}
+                                  className="px-2.5 py-1.5 bg-rose-50 text-rose-700 rounded-lg font-bold hover:bg-rose-100"
                                 >
-                                  🗑️
+                                  Eliminar
                                 </button>
-
                               </div>
                             </td>
-
                           </tr>
                         ))}
 
+                      {products.filter(
+                        p =>
+                          inventoryFilterMode === 'all' ||
+                          p.stock <= 5
+                      ).length === 0 && (
+                        <tr>
+                          <td
+                            colSpan={5}
+                            className="p-10 text-center text-slate-400"
+                          >
+                            No hay productos para mostrar.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
               </div>
-
-            </div>
-
-            {/* TASA */}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
-
-                <h3 className="text-base font-extrabold text-slate-800">
-                  💱 Tasa Oficial BCV
-                </h3>
-
-                <p className="text-xs text-slate-500">
-                  Actualiza la tasa de referencia para el cálculo instantáneo en bolívares.
-                </p>
-
-                <div className="flex gap-3">
-
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={
-                      exchangeRate
-                    }
-                    onChange={e =>
-                      setExchangeRate(
-                        parseFloat(
-                          e.target
-                            .value
-                        ) || 0
-                      )
-                    }
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5 text-xs font-bold"
-                  />
-
-                  <button
-                    onClick={() =>
-                      alert(
-                        '¡Tasa de cambio guardada!'
-                      )
-                    }
-                    className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition shadow-sm"
-                  >
-                    Guardar
-                  </button>
-
-                </div>
-              </div>
-
             </div>
           </div>
         )}
 
         {/* ====================================================
             REPORTES
-        ==================================================== */}
-
-        {activeTab ===
-          'reports' && (
-          <div className="space-y-6">
-
-            <div className="flex justify-between items-center bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
-
-              <div>
-                <h3 className="text-lg font-extrabold text-slate-800">
-                  📊 Reportes y Analítica Comercial
-                </h3>
-
-                <p className="text-xs text-slate-500">
-                  Monitoreo de ingresos y tendencias de venta.
-                </p>
-              </div>
-
-              <div className="flex gap-2">
-
-                {(
-                  [
-                    'all',
-                    'today',
-                    'week',
-                    'month'
-                  ] as const
-                ).map(
-                  period => (
-                    <button
-                      key={
-                        period
-                      }
-                      onClick={() =>
+            ==================================================== */}
+            {activeTab === 'reports' && (
+              <div className="space-y-6">
+                <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
+                  <div className="flex flex-col sm:flex-row justify-between gap-3 items-start sm:items-center border-b border-slate-100 pb-4">
+                    <div>
+                      <h3 className="text-lg font-extrabold text-slate-800">
+                        📊 Reportes de Ventas
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Seguimiento de ventas registradas en la base de datos.
+                      </p>
+                    </div>
+                    <select
+                      value={reportFilterPeriod}
+                      onChange={e =>
                         setReportFilterPeriod(
-                          period
+                          e.target.value as 'all' | 'today' | 'week' | 'month'
                         )
                       }
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold uppercase transition ${
-                        reportFilterPeriod ===
-                        period
-                          ? 'bg-blue-600 text-white shadow-sm'
-                          : 'bg-slate-100 text-slate-600'
-                      }`}
+                      className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold"
                     >
-                      {period ===
-                      'all'
-                        ? 'Histórico'
-                        : period ===
-                          'today'
-                        ? 'Hoy'
-                        : period ===
-                          'week'
-                        ? 'Semana'
-                        : 'Mes'}
-                    </button>
-                  )
-                )}
+                      <option value="all">Todo</option>
+                      <option value="today">Hoy</option>
+                      <option value="week">Últimos 7 días</option>
+                      <option value="month">Últimos 30 días</option>
+                    </select>
+                  </div>
 
-              </div>
-            </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
+                    <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
+                      <div className="text-[10px] uppercase font-bold text-blue-600">Ventas</div>
+                      <div className="text-xl font-black text-slate-900 mt-1">
+                        ${salesHistory.reduce((a, s) => a + s.totalUSD, 0).toFixed(2)}
+                      </div>
+                    </div>
+                    <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4">
+                      <div className="text-[10px] uppercase font-bold text-emerald-600">Transacciones</div>
+                      <div className="text-xl font-black text-slate-900 mt-1">
+                        {salesHistory.length}
+                      </div>
+                    </div>
+                    <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
+                      <div className="text-[10px] uppercase font-bold text-amber-700">Ticket promedio</div>
+                      <div className="text-xl font-black text-slate-900 mt-1">
+                        ${salesHistory.length ? (salesHistory.reduce((a, s) => a + s.totalUSD, 0) / salesHistory.length).toFixed(2) : '0.00'}
+                      </div>
+                    </div>
+                  </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
-
-                <h4 className="font-extrabold text-slate-800 text-sm">
-                  Tendencia de Ventas ($)
-                </h4>
-
-                <div className="h-64">
-
-                  <ResponsiveContainer
-                    width="100%"
-                    height="100%"
-                  >
-                    <LineChart
-                      data={salesHistory
-                        .slice(
-                          0,
-                          10
-                        )
-                        .reverse()}
-                    >
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="#f1f5f9"
-                      />
-
-                      <XAxis
-                        dataKey="date"
-                        tick={{
-                          fontSize: 10
-                        }}
-                      />
-
-                      <YAxis
-                        tick={{
-                          fontSize: 10
-                        }}
-                      />
-
-                      <Tooltip />
-
-                      <Line
-                        type="monotone"
-                        dataKey="totalUSD"
-                        stroke="#2563eb"
-                        strokeWidth={3}
-                        dot={{
-                          fill: '#2563eb',
-                          r: 4
-                        }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-
+                  <div className="h-80 mt-6">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={(() => {
+                          const map: Record<string, number> = {};
+                          salesHistory.forEach(s => {
+                            const d = new Date(s.created_at || s.date);
+                            const key = `${d.getDate()}/${d.getMonth() + 1}`;
+                            map[key] = (map[key] || 0) + s.totalUSD;
+                          });
+                          return Object.entries(map)
+                            .slice(-14)
+                            .map(([date, total]) => ({
+                              date,
+                              total: Number(total.toFixed(2))
+                            }));
+                        })()}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="total" name="Ventas USD" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
-              </div>
 
-              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
-
-                <h4 className="font-extrabold text-slate-800 text-sm">
-                  Volumen por Transacción
-                </h4>
-
-                <div className="h-64">
-
-                  <ResponsiveContainer
-                    width="100%"
-                    height="100%"
-                  >
-                    <BarChart
-                      data={salesHistory
-                        .slice(
-                          0,
-                          10
-                        )
-                        .reverse()}
-                    >
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="#f1f5f9"
-                      />
-
-                      <XAxis
-                        dataKey="date"
-                        tick={{
-                          fontSize: 10
-                        }}
-                      />
-
-                      <YAxis
-                        tick={{
-                          fontSize: 10
-                        }}
-                      />
-
-                      <Tooltip />
-
-                      <Bar
-                        dataKey="totalUSD"
-                        fill="#3b82f6"
-                        radius={[
-                          6,
-                          6,
-                          0,
-                          0
-                        ]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
-
-              <h4 className="font-extrabold text-slate-800 text-sm">
-                Historial Detallado
-              </h4>
-
-              <div className="overflow-x-auto">
-
-                <table className="w-full text-left border-collapse text-xs">
-
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 uppercase font-bold text-[10px]">
-
-                      <th className="p-3">
-                        ID / Fecha
-                      </th>
-
-                      <th className="p-3">
-                        Cliente
-                      </th>
-
-                      <th className="p-3">
-                        Método de Pago
-                      </th>
-
-                      <th className="p-3">
-                        Caja
-                      </th>
-
-                      <th className="p-3">
-                        Total USD
-                      </th>
-
-                      <th className="p-3">
-                        Total Bs.
-                      </th>
-
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-slate-100">
-
-                    {salesHistory.length ===
-                      0 && (
-                      <tr>
-                        <td
-                          colSpan={
-                            6
-                          }
-                          className="text-center py-8 text-slate-400"
-                        >
-                          No hay ventas registradas.
-                        </td>
-                      </tr>
-                    )}
-
-                    {salesHistory.map(
-                      sale => (
-                        <tr
-                          key={
-                            sale.id
-                          }
-                          className="hover:bg-slate-50/60 transition"
-                        >
-
-                          <td className="p-3">
-
-                            <div className="font-bold text-slate-800">
-                              #
-                              {
-                                sale.id
-                              }
-                            </div>
-
-                            <div className="text-[10px] text-slate-400">
-                              {
-                                sale.date
-                              }
-                            </div>
-
-                          </td>
-
-                          <td className="p-3 font-bold text-slate-700">
-                            {
-                              sale.clientName ||
-                              'Cliente Genérico'
-                            }
-                          </td>
-
-                          <td className="p-3">
-
-                            <span className="bg-blue-50 text-blue-700 font-bold px-2.5 py-1 rounded-lg">
-                              {
-                                sale.paymentMethod
-                              }
-                            </span>
-
-                          </td>
-
-                          <td className="p-3 text-slate-500">
-                            {sale.cashRegisterId
-                              ? `#${sale.cashRegisterId}`
-                              : 'N/A'}
-                          </td>
-
-                          <td className="p-3 font-black text-slate-900">
-                            $
-                            {sale.totalUSD.toFixed(
-                              2
-                            )}
-                          </td>
-
-                          <td className="p-3 text-slate-500">
-                            Bs.{' '}
-                            {sale.totalBs.toFixed(
-                              2
-                            )}
-                          </td>
-
-                        </tr>
-                      )
-                    )}
-
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ====================================================
-            CUENTAS
-        ==================================================== */}
-
-        {activeTab ===
-          'accounts' && (
-          <div className="space-y-6">
-
-            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
-
-              <h3 className="text-lg font-extrabold text-slate-800">
-                📑 Cuentas por Cobrar (Créditos / Fiados)
-              </h3>
-
-              <div className="overflow-x-auto">
-
-                <table className="w-full text-left border-collapse text-xs">
-
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 uppercase font-bold text-[10px]">
-
-                      <th className="p-3">
-                        Cliente
-                      </th>
-
-                      <th className="p-3">
-                        Contacto
-                      </th>
-
-                      <th className="p-3">
-                        Deuda USD
-                      </th>
-
-                      <th className="p-3">
-                        Deuda Bs.
-                      </th>
-
-                      <th className="p-3">
-                        Estado
-                      </th>
-
-                      <th className="p-3 text-right">
-                        Acciones
-                      </th>
-
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-slate-100">
-
-                    {credits.length ===
-                      0 && (
-                      <tr>
-                        <td
-                          colSpan={
-                            6
-                          }
-                          className="text-center py-8 text-slate-400"
-                        >
-                          No hay créditos activos.
-                        </td>
-                      </tr>
-                    )}
-
-                    {credits.map(
-                      c => (
-                        <tr
-                          key={
-                            c.id
-                          }
-                          className="hover:bg-slate-50/60 transition"
-                        >
-
-                          <td className="p-3 font-bold text-slate-800">
-                            {
-                              c.clientName
-                            }
-                          </td>
-
-                          <td className="p-3 text-slate-500">
-                            {
-                              c.clientPhone
-                            }{' '}
-                            /{' '}
-                            {
-                              c.clientDocument
-                            }
-                          </td>
-
-                          <td className="p-3 font-black text-slate-900">
-                            $
-                            {c.totalDebtUSD.toFixed(
-                              2
-                            )}
-                          </td>
-
-                          <td className="p-3 text-slate-500">
-                            Bs.{' '}
-                            {c.totalDebtBs.toFixed(
-                              2
-                            )}
-                          </td>
-
-                          <td className="p-3">
-
-                            <span
-                              className={`px-2.5 py-1 rounded-lg font-bold ${
-                                c.status ===
-                                'Pendiente'
-                                  ? 'bg-amber-50 text-amber-700'
-                                  : 'bg-emerald-50 text-emerald-700'
-                              }`}
-                            >
-                              {
-                                c.status
-                              }
-                            </span>
-
-                          </td>
-
-                          <td className="p-3 text-right">
-
-                            {c.status ===
-                              'Pendiente' && (
-                              <button
-                                onClick={() => {
-                                  setCredits(
-                                    prev =>
-                                      prev.map(
-                                        item =>
-                                          item.id ===
-                                          c.id
-                                            ? {
-                                                ...item,
-                                                status:
-                                                  'Pagado'
-                                              }
-                                            : item
-                                      )
-                                  );
-
-                                  alert(
-                                    '¡Crédito marcado como pagado!'
-                                  );
-                                }}
-                                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3.5 py-1.5 rounded-xl transition shadow-2xs"
-                              >
-                                Cobrar ✓
-                              </button>
-                            )}
-
-                          </td>
-
-                        </tr>
-                      )
-                    )}
-
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
-
-                <h3 className="font-extrabold text-slate-800 text-base">
-                  ➕ Registrar Cuenta por Pagar
-                </h3>
-
-                <form
-                  onSubmit={
-                    handleAddPayable
-                  }
-                  className="space-y-3"
-                >
-
-                  <input
-                    type="text"
-                    placeholder="Proveedor *"
-                    required
-                    value={
-                      newProviderName
-                    }
-                    onChange={e =>
-                      setNewProviderName(
-                        e.target
-                          .value
-                      )
-                    }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs"
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="Rif / Cédula"
-                    value={
-                      newProviderDoc
-                    }
-                    onChange={e =>
-                      setNewProviderDoc(
-                        e.target
-                          .value
-                      )
-                    }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs"
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="Descripción de la deuda"
-                    value={
-                      newPayableDesc
-                    }
-                    onChange={e =>
-                      setNewPayableDesc(
-                        e.target
-                          .value
-                      )
-                    }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs"
-                  />
-
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Monto USD ($) *"
-                    required
-                    value={
-                      newPayableAmountUSD
-                    }
-                    onChange={e =>
-                      setNewPayableAmountUSD(
-                        e.target
-                          .value
-                      )
-                    }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs"
-                  />
-
-                  <input
-                    type="date"
-                    value={
-                      newDueDate
-                    }
-                    onChange={e =>
-                      setNewDueDate(
-                        e.target
-                          .value
-                      )
-                    }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs"
-                  />
-
-                  <button
-                    type="submit"
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-2xl text-xs shadow-sm transition"
-                  >
-                    Guardar Deuda 💾
-                  </button>
-
-                </form>
-              </div>
-
-              <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
-
-                <h3 className="font-extrabold text-slate-800 text-base">
-                  📋 Cuentas por Pagar a Proveedores
-                </h3>
-
-                <div className="overflow-x-auto">
-
-                  <table className="w-full text-left border-collapse text-xs">
-
+                <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 uppercase font-bold text-[10px]">
-
-                        <th className="p-3">
-                          Proveedor
-                        </th>
-
-                        <th className="p-3">
-                          Descripción
-                        </th>
-
-                        <th className="p-3">
-                          Monto USD
-                        </th>
-
-                        <th className="p-3">
-                          Estado
-                        </th>
-
-                        <th className="p-3 text-right">
-                          Acciones
-                        </th>
-
+                      <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 uppercase text-[10px] font-bold">
+                        <th className="p-3">ID</th>
+                        <th className="p-3">Fecha</th>
+                        <th className="p-3">Cliente</th>
+                        <th className="p-3">Método</th>
+                        <th className="p-3">Total USD</th>
+                        <th className="p-3">Total Bs.</th>
+                        <th className="p-3">Caja</th>
                       </tr>
                     </thead>
-
                     <tbody className="divide-y divide-slate-100">
-
-                      {payables.length ===
-                        0 && (
-                        <tr>
-                          <td
-                            colSpan={
-                              5
-                            }
-                            className="text-center py-8 text-slate-400"
-                          >
-                            No hay cuentas por pagar.
-                          </td>
-                        </tr>
-                      )}
-
-                      {payables.map(
-                        p => (
-                          <tr
-                            key={
-                              p.id
-                            }
-                            className="hover:bg-slate-50/60 transition"
-                          >
-
-                            <td className="p-3 font-bold text-slate-800">
-                              {
-                                p.providerName
-                              }
-                            </td>
-
+                      {salesHistory
+                        .filter(s => {
+                          if (reportFilterPeriod === 'all') return true;
+                          const date = new Date(s.created_at || s.date);
+                          const now = new Date();
+                          const diff = now.getTime() - date.getTime();
+                          if (reportFilterPeriod === 'today') {
+                            return date.toDateString() === now.toDateString();
+                          }
+                          if (reportFilterPeriod === 'week') return diff <= 7 * 86400000;
+                          return diff <= 30 * 86400000;
+                        })
+                        .map(s => (
+                          <tr key={s.id} className="hover:bg-slate-50/70">
+                            <td className="p-3 font-bold">#{s.id}</td>
                             <td className="p-3 text-slate-500">
-                              {
-                                p.description
-                              }
+                              {new Date(s.created_at || s.date).toLocaleString()}
                             </td>
-
-                            <td className="p-3 font-black text-slate-900">
-                              $
-                              {p.totalDebtUSD.toFixed(
-                                2
-                              )}
+                            <td className="p-3 font-semibold">
+                              {s.clientName || 'Cliente Genérico'}
                             </td>
-
-                            <td className="p-3">
-
-                              <span
-                                className={`px-2.5 py-1 rounded-lg font-bold ${
-                                  p.status ===
-                                  'Pendiente'
-                                    ? 'bg-amber-50 text-amber-700'
-                                    : 'bg-emerald-50 text-emerald-700'
-                                }`}
-                              >
-                                {
-                                  p.status
-                                }
-                              </span>
-
-                            </td>
-
-                            <td className="p-3 text-right">
-
-                              {p.status ===
-                                'Pendiente' && (
-                                <button
-                                  onClick={() => {
-                                    setPayables(
-                                      prev =>
-                                        prev.map(
-                                          item =>
-                                            item.id ===
-                                            p.id
-                                              ? {
-                                                  ...item,
-                                                  status:
-                                                    'Pagado'
-                                                }
-                                              : item
-                                        )
-                                    );
-
-                                    alert(
-                                      '¡Cuenta pagada!'
-                                    );
-                                  }}
-                                  className="bg-emerald-600 text-white px-3.5 py-1.5 rounded-xl font-bold shadow-2xs"
-                                >
-                                  Pagar ✓
-                                </button>
-                              )}
-
-                            </td>
-
+                            <td className="p-3">{s.paymentMethod}</td>
+                            <td className="p-3 font-black">${s.totalUSD.toFixed(2)}</td>
+                            <td className="p-3">Bs. {s.totalBs.toFixed(2)}</td>
+                            <td className="p-3">#{s.cashRegisterId || '—'}</td>
                           </tr>
-                        )
-                      )}
-
+                        ))}
                     </tbody>
                   </table>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* CLIENTES */}
+            {/* ====================================================
+                CUENTAS / FINANZAS
+            ==================================================== */}
+            {activeTab === 'accounts' && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {userPermissions.includes('view_credits') && (
+                  <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
+                    <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                      <div>
+                        <h3 className="text-lg font-extrabold">💳 Cuentas por Cobrar</h3>
+                        <p className="text-xs text-slate-500">Ventas a crédito / fiado.</p>
+                      </div>
+                      <span className="bg-amber-50 text-amber-700 border border-amber-100 rounded-xl px-3 py-1 text-xs font-bold">
+                        {credits.filter(c => c.status === 'Pendiente').length} pendientes
+                      </span>
+                    </div>
+                    <div className="mt-4 space-y-2 max-h-[520px] overflow-y-auto">
+                      {credits.length === 0 ? (
+                        <div className="text-center py-10 text-slate-400 text-xs">
+                          No hay cuentas por cobrar.
+                        </div>
+                      ) : credits.map(c => (
+                        <div key={c.id} className="border border-slate-200 rounded-2xl p-4 flex justify-between gap-3">
+                          <div>
+                            <div className="font-bold text-sm">{c.clientName}</div>
+                            <div className="text-[10px] text-slate-500 mt-1">
+                              {c.clientDocument} · {c.clientPhone}
+                            </div>
+                            <div className="text-[10px] text-slate-400 mt-1">Venta #{c.saleId} · {c.date}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-black">${c.totalDebtUSD.toFixed(2)}</div>
+                            <div className="text-[10px] text-slate-500">Bs. {c.totalDebtBs.toFixed(2)}</div>
+                            <span className={`inline-block mt-1 px-2 py-1 rounded-lg text-[9px] font-bold ${c.status === 'Pagado' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                              {c.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-        {activeTab ===
-          'customers' && (
-          <CustomersDirectoryModule />
-        )}
-
-        {/* ROLES */}
-
-        {activeTab ===
-          'roles' && (
-          <RolesManagerModule />
-        )}
-
-      </main>
-
-      {/* ======================================================
-          MODAL ABRIR CAJA
-      ====================================================== */}
-
-      {showOpenCashModal && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4">
-
-            <div className="text-center space-y-1">
-
-              <span className="text-3xl">
-                🔓
-              </span>
-
-              <h3 className="text-lg font-black text-slate-900">
-                Apertura Obligatoria de Turno
-              </h3>
-
-              <p className="text-xs text-slate-500">
-                Debe registrar el fondo inicial en caja para poder entrar al módulo de ventas POS.
-              </p>
-
-            </div>
-
-            <form
-              onSubmit={
-                handleOpenCashSubmit
-              }
-              className="space-y-3"
-            >
-
-              <div>
-
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Fondo Inicial USD ($)
-                </label>
-
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  required
-                  value={
-                    openingUSD
-                  }
-                  onChange={e =>
-                    setOpeningUSD(
-                      e.target
-                        .value
-                    )
-                  }
-                  placeholder="0.00"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs font-bold shadow-2xs"
-                />
-
+                {userPermissions.includes('view_payables') || userPermissions.includes('manage_payables') ? (
+                  <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
+                    <div className="border-b border-slate-100 pb-3">
+                      <h3 className="text-lg font-extrabold">📑 Cuentas por Pagar</h3>
+                      <p className="text-xs text-slate-500">Proveedores y obligaciones pendientes.</p>
+                    </div>
+                    <form onSubmit={handleAddPayable} className="mt-4 bg-slate-50/70 border border-slate-200 rounded-2xl p-4 space-y-2.5">
+                      <input
+                        value={newProviderName}
+                        onChange={e => setNewProviderName(e.target.value)}
+                        placeholder="Proveedor *"
+                        required
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input value={newProviderDoc} onChange={e => setNewProviderDoc(e.target.value)} placeholder="RIF / Documento" className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs" />
+                        <input value={newPayableAmountUSD} onChange={e => setNewPayableAmountUSD(e.target.value)} placeholder="Monto USD *" type="number" step="0.01" min="0" required className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs" />
+                      </div>
+                      <input value={newPayableDesc} onChange={e => setNewPayableDesc(e.target.value)} placeholder="Descripción" className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs" />
+                      <input value={newDueDate} onChange={e => setNewDueDate(e.target.value)} type="date" className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs" />
+                      <button className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-xl py-2.5 text-xs font-bold">Registrar Cuenta</button>
+                    </form>
+                    <div className="mt-4 space-y-2 max-h-[350px] overflow-y-auto">
+                      {payables.map(p => (
+                        <div key={p.id} className="border border-slate-200 rounded-2xl p-4 flex justify-between gap-3">
+                          <div>
+                            <div className="font-bold text-sm">{p.providerName}</div>
+                            <div className="text-[10px] text-slate-500">{p.providerDocument} · {p.description}</div>
+                            <div className="text-[10px] text-slate-400 mt-1">Vence: {p.dueDate}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-black">${p.totalDebtUSD.toFixed(2)}</div>
+                            <div className="text-[10px] text-slate-500">Bs. {p.totalDebtBs.toFixed(2)}</div>
+                            <span className="inline-block mt-1 bg-amber-50 text-amber-700 px-2 py-1 rounded-lg text-[9px] font-bold">{p.status}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
+            )}
 
-              <div>
+            {/* ====================================================
+                CLIENTES
+            ==================================================== */}
+            {activeTab === 'customers' && <CustomersDirectoryModule />}
 
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Fondo Inicial Bs. (Bs.)
-                </label>
-
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  required
-                  value={
-                    openingBs
-                  }
-                  onChange={e =>
-                    setOpeningBs(
-                      e.target
-                        .value
-                    )
-                  }
-                  placeholder="0.00"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs font-bold shadow-2xs"
-                />
-
+            {/* ====================================================
+                ROLES
+            ==================================================== */}
+            {activeTab === 'roles' && userPermissions.includes('manage_roles') && (
+              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
+                <RolesManagerModule />
               </div>
+            )}
+          </main>
 
-              <div className="flex gap-2 pt-1">
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setShowOpenCashModal(
-                      false
-                    )
-                  }
-                  className="flex-1 bg-slate-100 hover:bg-slate-200 py-3 rounded-2xl text-xs font-bold text-slate-600 transition"
-                >
-                  Cancelar
-                </button>
-
-                <button
-                  type="submit"
-                  className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-2xl text-xs transition shadow-sm"
-                >
-                  Abrir Caja ⚡
-                </button>
-
+          {/* ====================================================
+              MODAL ABRIR CAJA
+          ==================================================== */}
+          {showOpenCashModal && (
+            <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900">🔓 Abrir Caja</h3>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Usuario: {currentUserObj?.name || authenticatedUser?.email || '—'}
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => setShowOpenCashModal(false)} className="text-slate-400 hover:text-slate-700 text-2xl">×</button>
+                </div>
+                <form onSubmit={handleOpenCashSubmit} className="space-y-4 pt-5">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Monto inicial USD</label>
+                    <input value={openingUSD} onChange={e => setOpeningUSD(e.target.value)} type="number" step="0.01" min="0" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Monto inicial Bs.</label>
+                    <input value={openingBs} onChange={e => setOpeningBs(e.target.value)} type="number" step="0.01" min="0" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm" placeholder="0.00" />
+                  </div>
+                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-2xl">Abrir Caja</button>
+                </form>
               </div>
-
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================
-          MODAL CERRAR CAJA
-      ====================================================== */}
-
-      {showCloseCashModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 animate-scaleUp">
-
-            <h3 className="text-base font-extrabold text-slate-800">
-              🔒 Arqueo y Cierre de Caja
-            </h3>
-
-            <p className="text-xs text-slate-500">
-              Ingrese el efectivo físico total contado en gaveta para cerrar el turno actual.
-            </p>
-
-            <div className="space-y-3">
-
-              <div>
-
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Total USD Contado ($)
-                </label>
-
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={
-                    countedUSD
-                  }
-                  onChange={e =>
-                    setCountedUSD(
-                      e.target
-                        .value
-                    )
-                  }
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs font-bold"
-                />
-
-              </div>
-
-              <div>
-
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Total Bs. Contado (Bs.)
-                </label>
-
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={
-                    countedBs
-                  }
-                  onChange={e =>
-                    setCountedBs(
-                      e.target
-                        .value
-                    )
-                  }
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs font-bold"
-                />
-
-              </div>
-
             </div>
+          )}
 
-            <div className="flex gap-2 pt-2">
-
-              <button
-                onClick={() =>
-                  setShowCloseCashModal(
-                    false
-                  )
-                }
-                className="flex-1 bg-slate-100 hover:bg-slate-200 py-3 rounded-2xl text-xs font-bold text-slate-600 transition"
-              >
-                Cancelar
-              </button>
-
-              <button
-                onClick={
-                  handleCloseCashSubmit
-                }
-                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-2xl text-xs font-bold shadow-sm transition"
-              >
-                Confirmar Cierre ✓
-              </button>
-
+          {/* ====================================================
+              MODAL CERRAR CAJA
+          ==================================================== */}
+          {showCloseCashModal && (
+            <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900">🔒 Arqueo / Cerrar Caja</h3>
+                    <p className="text-[10px] text-slate-500 mt-1">Caja #{activeRegisterId || '—'}</p>
+                  </div>
+                  <button type="button" onClick={() => setShowCloseCashModal(false)} className="text-slate-400 hover:text-slate-700 text-2xl">×</button>
+                </div>
+                <div className="pt-5 space-y-4">
+                  <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-xs text-blue-900">
+                    El cierre se realizará sobre la caja abierta en la base de datos para este usuario.
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Efectivo contado USD</label>
+                    <input value={countedUSD} onChange={e => setCountedUSD(e.target.value)} type="number" step="0.01" min="0" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Efectivo contado Bs.</label>
+                    <input value={countedBs} onChange={e => setCountedBs(e.target.value)} type="number" step="0.01" min="0" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm" placeholder="0.00" />
+                  </div>
+                  <button type="button" onClick={handleCloseCashSubmit} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-2xl">Cerrar y Arquear Caja</button>
+                </div>
+              </div>
             </div>
+          )}
 
-          </div>
-        </div>
-      )}
+          {/* ====================================================
+              MODAL CHECKOUT
+          ==================================================== */}
+          {isCheckoutModalOpen && (
+            <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+              <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl p-6 my-8">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                  <div>
+                    <h3 className="text-lg font-black">💳 Confirmar Venta</h3>
+                    <p className="text-[10px] text-slate-500">Caja #{activeRegisterId || '—'} · {currentUserObj?.name || 'Usuario'}</p>
+                  </div>
+                  <button type="button" onClick={() => setIsCheckoutModalOpen(false)} className="text-slate-400 text-2xl">×</button>
+                </div>
 
-      {/* ======================================================
-          MODAL CHECKOUT
-      ====================================================== */}
+                <form onSubmit={handleCheckout} className="space-y-4 pt-5">
+                  <POSCustomerSelector
+                    onSelectCustomer={c => {
+                      setClientName(c.name);
+                      setClientDocument(c.document);
+                      setClientPhone(c.phone);
+                    }}
+                  />
 
-      {isCheckoutModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Método de pago</label>
+                      <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as PaymentMethodType)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-3 text-xs font-bold">
+                        <option>Efectivo USD</option>
+                        <option>Efectivo Bs</option>
+                        <option>Pago Móvil</option>
+                        <option>Zelle</option>
+                        <option>Binance Pay</option>
+                        <option>Crédito / Fiado</option>
+                      </select>
+                    </div>
+                    {paymentMethod === 'Efectivo USD' && (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Efectivo recibido USD</label>
+                        <input value={cashGivenUSD} onChange={e => setCashGivenUSD(e.target.value)} type="number" step="0.01" min="0" required className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-3 text-xs" placeholder="0.00" />
+                      </div>
+                    )}
+                  </div>
 
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-scaleUp">
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+                    <div className="flex justify-between text-xs"><span>Subtotal</span><b>${subtotalUSD.toFixed(2)}</b></div>
+                    <div className="flex justify-between text-xs"><span>IVA</span><b>${ivaUSD.toFixed(2)}</b></div>
+                    <div className="flex justify-between text-base font-black border-t pt-2"><span>Total USD</span><b>${totalUSD.toFixed(2)}</b></div>
+                    <div className="flex justify-between text-xs font-bold text-blue-600"><span>Total Bs.</span><b>Bs. {totalBs.toFixed(2)}</b></div>
+                    {paymentMethod === 'Efectivo USD' && Number(cashGivenUSD || 0) >= totalUSD && (
+                      <div className="flex justify-between text-xs text-emerald-700 font-bold border-t pt-2">
+                        <span>Cambio</span>
+                        <b>${(Number(cashGivenUSD || 0) - totalUSD).toFixed(2)}</b>
+                      </div>
+                    )}
+                  </div>
 
-            <div className="flex justify-between items-center">
-
-              <h3 className="text-base font-extrabold text-slate-800">
-                💳 Procesar Pago
-              </h3>
-
-              <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg font-bold">
-                Caja #
-                {activeRegisterId}
-              </span>
-
+                  <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-2xl shadow-md">Confirmar y Registrar Venta</button>
+                </form>
+              </div>
             </div>
+          )}
 
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-1">
+          {/* ====================================================
+              MODAL REPOSICIÓN
+          ==================================================== */}
+          {isRestockModalOpen && selectedProductForRestock && (
+            <div className="fixed inset-0 z-[100] bg-slate-950/60 flex items-center justify-center p-4">
+              <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                  <h3 className="font-black">📦 Reabastecer Producto</h3>
+                  <button type="button" onClick={() => setIsRestockModalOpen(false)} className="text-slate-400 text-2xl">×</button>
+                </div>
+                <form onSubmit={handleRestock} className="pt-5 space-y-4">
+                  <div className="bg-slate-50 rounded-2xl p-4">
+                    <div className="font-bold text-sm">{selectedProductForRestock.name}</div>
+                    <div className="text-xs text-slate-500 mt-1">Stock actual: {selectedProductForRestock.stock}</div>
+                  </div>
+                  <input autoFocus required type="number" min="1" step="1" value={restockAmount} onChange={e => setRestockAmount(e.target.value)} placeholder="Cantidad a agregar" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm" />
+                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl py-3 font-bold">Reabastecer</button>
+                </form>
+              </div>
+            </div>
+          )}
 
-              <div className="flex justify-between text-xs font-bold text-slate-700">
+          {/* ====================================================
+              MODAL EDITAR PRODUCTO
+          ==================================================== */}
+          {isEditModalOpen && editingProduct && (
+            <div className="fixed inset-0 z-[100] bg-slate-950/60 flex items-center justify-center p-4 overflow-y-auto">
+              <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-6 my-6">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                  <h3 className="font-black">✏️ Editar Producto</h3>
+                  <button type="button" onClick={() => setIsEditModalOpen(false)} className="text-slate-400 text-2xl">×</button>
+                </div>
+                <form onSubmit={handleUpdateProduct} className="pt-5 space-y-3">
+                  <input required value={editName} onChange={e => setEditName(e.target.value)} placeholder="Nombre" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input required type="number" step="0.01" value={editPrice} onChange={e => setEditPrice(e.target.value)} placeholder="Precio venta" className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs" />
+                    <input type="number" step="0.01" value={editCostPrice} onChange={e => setEditCostPrice(e.target.value)} placeholder="Costo" className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs" />
+                  </div>
+                  <input required type="number" min="0" value={editStock} onChange={e => setEditStock(e.target.value)} placeholder="Stock" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs" />
+                  <select value={editCategory} onChange={e => setEditCategory(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold">
+                    {categoriesList.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Imagen</label>
+                    {editImage ? <img src={editImage} alt="Vista previa" className="w-full h-32 object-cover rounded-2xl border" /> : null}
+                    <input type="file" accept="image/*" onChange={e => handleImageUploadToImgBB(e, true)} className="w-full mt-2 text-xs" />
+                  </div>
+                  <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-2xl py-3 font-bold">Guardar Cambios</button>
+                </form>
+              </div>
+            </div>
+          )}
 
-                <span>
-                  Total a Pagar:
-                </span>
+          {/* ====================================================
+              MODAL VENTA EXITOSA / TICKET
+          ==================================================== */}
+          {successModalData?.isOpen && (
+            <div className="fixed inset-0 z-[110] bg-slate-950/70 flex items-center justify-center p-4 overflow-y-auto">
+              <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 my-6">
+                <div className="text-center">
+                  <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-3xl mx-auto">✓</div>
+                  <h3 className="text-xl font-black mt-4">¡Venta registrada!</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {successModalData.clientName || 'Cliente Genérico'}
+                  </p>
+                </div>
 
-                <span className="font-black text-slate-900">
-                  $
-                  {totalUSD.toFixed(
-                    2
-                  )}{' '}
-                  / Bs.{' '}
-                  {totalBs.toFixed(
-                    2
+                <div className="bg-slate-50 rounded-2xl p-4 mt-5 space-y-2 text-xs">
+                  <div className="flex justify-between"><span>Total</span><b>${lastPrintedSale?.totalUSD?.toFixed(2) || totalUSD.toFixed(2)}</b></div>
+                  {successModalData.changeUSD > 0 && (
+                    <div className="flex justify-between text-emerald-700"><span>Cambio USD</span><b>${successModalData.changeUSD.toFixed(2)}</b></div>
                   )}
-                </span>
-
-              </div>
-
-            </div>
-
-            <div className="space-y-3">
-
-              <label className="block text-xs font-bold text-slate-700">
-                Método de Pago
-              </label>
-
-              <select
-                value={
-                  paymentMethod
-                }
-                onChange={e =>
-                  setPaymentMethod(
-                    e.target
-                      .value as PaymentMethodType
-                  )
-                }
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs font-bold text-slate-800 shadow-2xs"
-              >
-
-                <option value="Efectivo USD">
-                  Efectivo USD ($)
-                </option>
-
-                <option value="Efectivo Bs">
-                  Efectivo Bs (Bs.)
-                </option>
-
-                <option value="Pago Móvil">
-                  Pago Móvil
-                </option>
-
-                <option value="Zelle">
-                  Zelle
-                </option>
-
-                <option value="Binance Pay">
-                  Binance Pay
-                </option>
-
-                <option value="Crédito / Fiado">
-                  Crédito / Fiado
-                </option>
-
-              </select>
-
-              {paymentMethod ===
-                'Efectivo USD' && (
-                <div>
-
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Efectivo Recibido ($)
-                  </label>
-
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={
-                      cashGivenUSD
-                    }
-                    onChange={e =>
-                      setCashGivenUSD(
-                        e.target
-                          .value
-                      )
-                    }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs font-bold shadow-2xs"
-                  />
-
+                  {successModalData.changeBs > 0 && (
+                    <div className="flex justify-between text-emerald-700"><span>Cambio Bs.</span><b>Bs. {successModalData.changeBs.toFixed(2)}</b></div>
+                  )}
+                  <div className="flex justify-between"><span>Método</span><b>{lastPrintedSale?.paymentMethod || paymentMethod}</b></div>
+                  <div className="flex justify-between"><span>Caja</span><b>#{lastPrintedSale?.cashRegisterId || activeRegisterId || '—'}</b></div>
                 </div>
-              )}
 
-              {paymentMethod ===
-                'Crédito / Fiado' && (
-                <div className="space-y-2.5">
-
-                  <input
-                    type="text"
-                    placeholder="Nombre del Cliente *"
-                    required
-                    value={
-                      clientName
-                    }
-                    onChange={e =>
-                      setClientName(
-                        e.target
-                          .value
-                      )
-                    }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs"
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="Cédula / RIF"
-                    value={
-                      clientDocument
-                    }
-                    onChange={e =>
-                      setClientDocument(
-                        e.target
-                          .value
-                      )
-                    }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs"
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="Teléfono"
-                    value={
-                      clientPhone
-                    }
-                    onChange={e =>
-                      setClientPhone(
-                        e.target
-                          .value
-                      )
-                    }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs"
-                  />
-
-                </div>
-              )}
-
-            </div>
-
-            <div className="flex gap-2 pt-2">
-
-              <button
-                onClick={() =>
-                  setIsCheckoutModalOpen(
-                    false
-                  )
-                }
-                className="flex-1 bg-slate-100 hover:bg-slate-200 py-3 rounded-2xl text-xs font-bold text-slate-600 transition"
-              >
-                Cancelar
-              </button>
-
-              <button
-                onClick={
-                  handleCheckout
-                }
-                disabled={
-                  !activeRegisterId ||
-                  !isCashOpen
-                }
-                className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white py-3 rounded-2xl text-xs font-bold shadow-sm transition"
-              >
-                Confirmar Venta ✓
-              </button>
-
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================
-          MODAL REPOSICIÓN
-      ====================================================== */}
-
-      {isRestockModalOpen &&
-        selectedProductForRestock && (
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-
-            <div className="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 animate-scaleUp">
-
-              <h3 className="text-base font-extrabold text-slate-800">
-                Reponer Inventario
-              </h3>
-
-              <p className="text-xs text-slate-500">
-                Producto:{' '}
-                <strong className="text-slate-800">
-                  {
-                    selectedProductForRestock.name
-                  }
-                </strong>{' '}
-                (Actual:{' '}
-                {
-                  selectedProductForRestock.stock
-                }
-                )
-              </p>
-
-              <form
-                onSubmit={
-                  handleRestock
-                }
-                className="space-y-3"
-              >
-
-                <input
-                  type="number"
-                  min="1"
-                  required
-                  placeholder="Cantidad a agregar *"
-                  value={
-                    restockAmount
-                  }
-                  onChange={e =>
-                    setRestockAmount(
-                      e.target
-                        .value
-                    )
-                  }
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs font-bold shadow-2xs"
-                />
-
-                <div className="flex gap-2">
-
+                <div className="mt-5 space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-2xl py-3 font-bold"
+                  >
+                    🖨️ Imprimir Ticket
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
-                      setIsRestockModalOpen(
-                        false
-                      );
-
-                      setSelectedProductForRestock(
-                        null
-                      );
-
-                      setRestockAmount(
-                        ''
-                      );
+                      setSuccessModalData(null);
+                      setLastPrintedSale(null);
                     }}
-                    className="flex-1 bg-slate-100 py-3 rounded-2xl text-xs font-bold text-slate-600"
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-2xl py-3 font-bold"
                   >
-                    Cancelar
+                    Listo
                   </button>
-
-                  <button
-                    type="submit"
-                    className="flex-1 bg-blue-600 text-white py-3 rounded-2xl text-xs font-bold shadow-sm"
-                  >
-                    Actualizar ➕
-                  </button>
-
                 </div>
 
-              </form>
-            </div>
-          </div>
-        )}
-
-      {/* ======================================================
-          MODAL EDITAR PRODUCTO
-      ====================================================== */}
-
-      {isEditModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-scaleUp max-h-[90vh] overflow-y-auto">
-
-            <h3 className="text-base font-extrabold text-slate-800">
-              ✏️ Editar Producto
-            </h3>
-
-            <form
-              onSubmit={
-                handleUpdateProduct
-              }
-              className="space-y-3"
-            >
-
-              <div>
-
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  Nombre *
-                </label>
-
-                <input
-                  type="text"
-                  required
-                  value={
-                    editName
-                  }
-                  onChange={e =>
-                    setEditName(
-                      e.target
-                        .value
-                    )
-                  }
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs"
-                />
-
-              </div>
-
-              <div className="space-y-1.5">
-
-                <label className="block text-[11px] font-bold text-slate-600">
-                  Imagen del Producto
-                </label>
-
-                {editImage ? (
-                  <div className="relative w-full h-28 rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center group">
-
-                    <img
-                      src={
-                        editImage
-                      }
-                      alt="Vista previa"
-                      className="w-full h-full object-cover"
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setEditImage(
-                          ''
-                        )
-                      }
-                      className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold bg-rose-600/80"
-                    >
-                      Quitar imagen
-                    </button>
-
-                  </div>
-                ) : (
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={e =>
-                      handleImageUploadToImgBB(
-                        e,
-                        true
-                      )
-                    }
-                    className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                  />
-                )}
-
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-
-                <div>
-
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Costo ($)
-                  </label>
-
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={
-                      editCostPrice
-                    }
-                    onChange={e =>
-                      setEditCostPrice(
-                        e.target
-                          .value
-                      )
-                    }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs"
-                  />
-
-                </div>
-
-                <div>
-
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Precio Venta ($) *
-                  </label>
-
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={
-                      editPrice
-                    }
-                    onChange={e =>
-                      setEditPrice(
-                        e.target
-                          .value
-                      )
-                    }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs"
-                  />
-
-                </div>
-
-              </div>
-
-              <div>
-
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  Categoría
-                </label>
-
-                <select
-                  value={
-                    editCategory
-                  }
-                  onChange={e =>
-                    setEditCategory(
-                      e.target
-                        .value
-                    )
-                  }
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs font-bold text-slate-800 shadow-2xs"
-                >
-                  {categoriesList.map(
-                    cat => (
-                      <option
-                        key={cat}
-                        value={cat}
-                      >
-                        {cat}
-                      </option>
-                    )
-                  )}
-                </select>
-
-              </div>
-
-              <div>
-
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  Stock Actual *
-                </label>
-
-                <input
-                  type="number"
-                  required
-                  value={
-                    editStock
-                  }
-                  onChange={e =>
-                    setEditStock(
-                      e.target
-                        .value
-                    )
-                  }
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs"
-                />
-
-              </div>
-
-              <div className="flex gap-2 pt-2">
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditModalOpen(
-                      false
-                    );
-
-                    setEditingProduct(
-                      null
-                    );
-                  }}
-                  className="flex-1 bg-slate-100 py-3 rounded-2xl text-xs font-bold text-slate-600"
-                >
-                  Cancelar
-                </button>
-
-                <button
-                  type="submit"
-                  className="flex-1 bg-blue-600 text-white py-3 rounded-2xl text-xs font-bold shadow-sm"
-                >
-                  Guardar Cambios ✓
-                </button>
-
-              </div>
-
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================
-          MODAL VENTA EXITOSA
-      ====================================================== */}
-
-      {successModalData &&
-        successModalData.isOpen && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-
-            <div className="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 text-center animate-scaleUp">
-
-              <div
-                id="printable-ticket"
-                className="bg-white text-slate-800 p-4 rounded-2xl border border-slate-100 text-left font-mono text-xs space-y-3"
-              >
-
-                <div className="text-center space-y-0.5 border-b border-dashed border-slate-300 pb-3">
-
-                  <h4 className="font-black text-sm uppercase">
-                    ⚡ Mi Empresa C.A.
-                  </h4>
-
-                  <p className="text-[10px] text-slate-500">
-                    RIF: J-00000000-0
-                  </p>
-
-                  <p className="text-[10px] text-slate-500">
-                    Sistema POS Enterprise
-                  </p>
-
-                </div>
-
-                <div className="space-y-1 text-[11px] border-b border-dashed border-slate-300 pb-3">
-
-                  <div className="flex justify-between">
-                    <span>
-                      Fecha:
-                    </span>
-
-                    <span className="font-bold">
-                      {
-                        lastPrintedSale?.date ||
-                        new Date().toLocaleString()
-                      }
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span>
-                      Cliente:
-                    </span>
-
-                    <span className="font-bold">
-                      {
-                        lastPrintedSale?.clientName ||
-                        'Cliente Genérico'
-                      }
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span>
-                      Método:
-                    </span>
-
-                    <span className="font-bold">
-                      {
-                        lastPrintedSale?.paymentMethod
-                      }
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span>
-                      Caja:
-                    </span>
-
-                    <span className="font-bold">
-                      #
-                      {
-                        lastPrintedSale?.cashRegisterId ||
-                        activeRegisterId
-                      }
-                    </span>
-                  </div>
-
-                </div>
-
-                <div className="space-y-1.5 border-b border-dashed border-slate-300 pb-3">
-
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">
-                    Descripción / Cant. / Precio
-                  </div>
-
-                  {lastPrintedSale?.items?.map(
-                    (
-                      item: any,
-                      idx: number
-                    ) => (
-                      <div
-                        key={idx}
-                        className="flex justify-between gap-2"
-                      >
-
-                        <span className="truncate flex-1">
-                          {
-                            item.quantity
-                          }
-                          x{' '}
-                          {
-                            item.name
-                          }
-                        </span>
-
-                        <span className="font-bold">
-                          $
-                          {(
-                            item.price *
-                            item.quantity
-                          ).toFixed(
-                            2
-                          )}
-                        </span>
-
+                {lastPrintedSale && (
+                  <div className="hidden print:block print-ticket mt-4 text-black text-xs">
+                    <div className="text-center font-black text-base">POS ENTERPRISE</div>
+                    <div className="text-center">Comprobante de Venta</div>
+                    <div className="border-b border-dashed border-black my-2" />
+                    <div>Venta: #{lastPrintedSale.id}</div>
+                    <div>Fecha: {lastPrintedSale.date}</div>
+                    <div>Cliente: {lastPrintedSale.clientName || 'Cliente Genérico'}</div>
+                    <div>Caja: #{lastPrintedSale.cashRegisterId || '—'}</div>
+                    <div className="border-b border-dashed border-black my-2" />
+                    {lastPrintedSale.items.map((item: CartItem) => (
+                      <div key={item.id} className="flex justify-between gap-2">
+                        <span>{item.quantity} x {item.name}</span>
+                        <span>${(item.quantity * item.price).toFixed(2)}</span>
                       </div>
-                    )
-                  )}
-
-                </div>
-
-                <div className="space-y-1 text-[11px] pt-1">
-
-                  <div className="flex justify-between">
-                    <span>
-                      Subtotal:
-                    </span>
-
-                    <span>
-                      $
-                      {lastPrintedSale?.subtotalUSD?.toFixed(
-                        2
-                      )}
-                    </span>
+                    ))}
+                    <div className="border-b border-dashed border-black my-2" />
+                    <div className="flex justify-between"><span>Subtotal</span><b>${lastPrintedSale.subtotalUSD.toFixed(2)}</b></div>
+                    <div className="flex justify-between"><span>IVA</span><b>${lastPrintedSale.ivaUSD.toFixed(2)}</b></div>
+                    <div className="flex justify-between text-sm"><span>Total</span><b>${lastPrintedSale.totalUSD.toFixed(2)}</b></div>
+                    <div className="flex justify-between"><span>Bs.</span><b>{lastPrintedSale.totalBs.toFixed(2)}</b></div>
+                    <div className="mt-3 text-center">¡Gracias por su compra!</div>
                   </div>
-
-                  <div className="flex justify-between">
-                    <span>
-                      IVA (16%):
-                    </span>
-
-                    <span>
-                      $
-                      {lastPrintedSale?.ivaUSD?.toFixed(
-                        2
-                      )}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between font-black text-sm pt-1 border-t border-slate-200">
-
-                    <span>
-                      TOTAL USD:
-                    </span>
-
-                    <span>
-                      $
-                      {lastPrintedSale?.totalUSD?.toFixed(
-                        2
-                      )}
-                    </span>
-
-                  </div>
-
-                  <div className="flex justify-between font-bold text-blue-600">
-
-                    <span>
-                      TOTAL Bs.:
-                    </span>
-
-                    <span>
-                      Bs.{' '}
-                      {lastPrintedSale?.totalBs?.toFixed(
-                        2
-                      )}
-                    </span>
-
-                  </div>
-
-                  {successModalData.changeUSD >
-                    0 && (
-                    <div className="flex justify-between text-emerald-600 font-bold pt-1">
-
-                      <span>
-                        Cambio Entregado:
-                      </span>
-
-                      <span>
-                        $
-                        {successModalData.changeUSD.toFixed(
-                          2
-                        )}
-                      </span>
-
-                    </div>
-                  )}
-
-                </div>
-
-                <div className="text-center pt-3 border-t border-dashed border-slate-300 text-[10px] text-slate-400">
-                  ¡Gracias por su compra!
-                  <br />
-                  Conserve su ticket.
-                </div>
-
+                )}
               </div>
-
-              <div className="flex gap-2 pt-2">
-
-                <button
-                  onClick={() =>
-                    window.print()
-                  }
-                  className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-2xl text-xs font-bold shadow-sm transition flex items-center justify-center gap-1.5"
-                >
-                  🖨️ Imprimir
-                </button>
-
-                <button
-                  onClick={() =>
-                    setSuccessModalData(
-                      null
-                    )
-                  }
-                  className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-2xl text-xs font-bold shadow-sm transition"
-                >
-                  Continuar ⚡
-                </button>
-
-              </div>
-
             </div>
-          </div>
-        )}
-
-    </div>
-  );
-}
+          )}
+        </div>
+      );
+    }
