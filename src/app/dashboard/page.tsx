@@ -515,8 +515,8 @@ export default function DashboardPOS() {
   const [authenticatedUser, setAuthenticatedUser] =
     useState<any>(null);
 
-  const authenticatedUserId =
-    Number(authenticatedUser?.id) || null;
+  const authenticatedUserId: number =
+    Number(authenticatedUser?.id) || 0;
 
   const [rolesList, setRolesList] =
     useState(getRoles());
@@ -1288,8 +1288,7 @@ export default function DashboardPOS() {
         return;
       }
 
-      const userId =
-        Number(currentUserObj?.id);
+      const userId = authenticatedUserId;
 
       if (
         !Number.isInteger(userId) ||
