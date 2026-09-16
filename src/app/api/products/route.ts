@@ -29,33 +29,28 @@ export async function GET() {
           barcode: p.barcode || '',
           price: Number(p.price_usd || 0),
           stock: Number(p.stock || 0),
-          taxable:
-            p.taxable !== undefined
-              ? Boolean(p.taxable)
-              : true,
+          taxable: p.taxable !== undefined ? Boolean(p.taxable) : true,
           category: p.category || 'General',
           costPrice: Number(p.cost_price || 0),
 
+          // IMPORTANTE:
           // La BD usa image_url
           // El frontend usa image
           image: p.image_url || '',
 
-          // Nueva descripción
+          // DESCRIPCIÓN
           description: p.description || '',
         }))
       : [];
 
     return NextResponse.json(formattedProducts);
-
   } catch (error: any) {
     console.error('Error en GET /api/products:', error);
 
     return NextResponse.json(
       {
         success: false,
-        error:
-          error.message ||
-          'Error interno del servidor',
+        error: error.message || 'Error interno del servidor',
       },
       { status: 500 }
     );
@@ -75,19 +70,16 @@ export async function POST(request: Request) {
       category,
       costPrice,
 
-      // Imagen
+      // Aceptamos image desde el frontend
+      // y también image_url por compatibilidad
       image,
       image_url,
 
-      // Descripción
+      // DESCRIPCIÓN
       description,
     } = body;
 
-    if (
-      !name ||
-      price === undefined ||
-      price === null
-    ) {
+    if (!name || price === undefined || price === null) {
       return NextResponse.json(
         {
           success: false,
@@ -99,75 +91,36 @@ export async function POST(request: Request) {
 
     const generatedBarcode =
       barcode ||
-      '759' +
-        Math.floor(
-          100000000 +
-            Math.random() * 900000000
-        );
+      '759' + Math.floor(100000000 + Math.random() * 900000000);
 
     const finalStock =
-      stock !== undefined
-        ? Number(stock)
-        : 0;
+      stock !== undefined ? Number(stock) : 0;
 
-    const finalTaxable =
-      taxable ? 1 : 0;
+    const finalTaxable = taxable ? 1 : 0;
 
     const finalCategory =
       category || 'General';
 
     const finalCost =
-      costPrice !== undefined
-        ? Number(costPrice)
-        : 0;
+      costPrice !== undefined ? Number(costPrice) : 0;
 
     // ==================================================
-    // IMAGEN
+    // AQUÍ ESTÁ LA CORRECCIÓN PRINCIPAL
     // ==================================================
     const finalImageUrl =
-      String(
-        image_url || image || ''
-      ).trim();
+      String(image_url || image || '').trim();
 
-    // ==================================================
     // DESCRIPCIÓN
-    // ==================================================
     const finalDescription =
       String(description || '').trim();
 
-    // ==================================================
-    // LIMPIEZA DE TEXTOS
-    // ==================================================
-    const cleanName =
-      String(name).replace(/'/g, "''");
+    // Escapamos valores de texto para SQLite
+    const cleanName = String(name).replace(/'/g, "''");
+    const cleanBarcode = String(generatedBarcode).replace(/'/g, "''");
+    const cleanCategory = String(finalCategory).replace(/'/g, "''");
+    const cleanImageUrl = finalImageUrl.replace(/'/g, "''");
+    const cleanDescription = finalDescription.replace(/'/g, "''");
 
-    const cleanBarcode =
-      String(generatedBarcode).replace(
-        /'/g,
-        "''"
-      );
-
-    const cleanCategory =
-      String(finalCategory).replace(
-        /'/g,
-        "''"
-      );
-
-    const cleanImageUrl =
-      finalImageUrl.replace(
-        /'/g,
-        "''"
-      );
-
-    const cleanDescription =
-      finalDescription.replace(
-        /'/g,
-        "''"
-      );
-
-    // ==================================================
-    // INSERT
-    // ==================================================
     await runQuery(async (db) => {
       return await db.sql(`
         INSERT INTO products (
@@ -202,19 +155,14 @@ export async function POST(request: Request) {
       image_url: finalImageUrl,
       description: finalDescription,
     });
-
   } catch (error: any) {
-    console.error(
-      'Error en POST /api/products:',
-      error
-    );
+    console.error('Error en POST /api/products:', error);
 
     return NextResponse.json(
       {
         success: false,
         error:
-          error.message ||
-          'Error al guardar el producto',
+          error.message || 'Error al guardar el producto',
       },
       { status: 500 }
     );
