@@ -21,6 +21,7 @@ type Product = {
   costPrice: number;
   price: number;
   category: string;
+  description?: string;
   taxable: boolean;
   stock: number;
   image?: string;
@@ -588,6 +589,9 @@ export default function DashboardPOS() {
   const [editCategory, setEditCategory] =
     useState('');
 
+  const [editDescription, setEditDescription] =
+    useState('');
+
   const [editImage, setEditImage] =
     useState('');
 
@@ -662,6 +666,9 @@ export default function DashboardPOS() {
 
   const [newCategory, setNewCategory] =
     useState('Comida');
+
+  const [newDescription, setNewDescription] =
+    useState('');
 
   const [newTaxable, setNewTaxable] =
     useState(true);
@@ -1931,6 +1938,9 @@ if (
               category:
                 newCategory,
 
+              description:
+                newDescription.trim(),
+
               taxable:
                 newTaxable,
 
@@ -1961,6 +1971,7 @@ if (
         setNewPrice('');
         setNewStock('');
         setNewImage('');
+        setNewDescription('');
         setSelectedFileName('');
 
         const prodRes =
@@ -2133,6 +2144,10 @@ if (
       product.image || ''
     );
 
+    setEditDescription(
+      product.description || ''
+    );
+
     setIsEditModalOpen(
       true
     );
@@ -2188,7 +2203,10 @@ if (
                   editCategory,
 
                 image:
-                  editImage
+                  editImage,
+
+                description:
+                  editDescription.trim()
               })
             }
           );
@@ -3252,6 +3270,25 @@ if (
                     />
                   </div>
 
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Descripción del plato
+                    </label>
+                    <textarea
+                      value={newDescription}
+                      onChange={e =>
+                        setNewDescription(e.target.value)
+                      }
+                      maxLength={500}
+                      rows={3}
+                      placeholder="Ej. Roll de salmón, aguacate y queso crema."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs resize-none"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Describe brevemente los ingredientes o características del plato.
+                    </p>
+                  </div>
+
                   <div className="space-y-1.5">
 
                     <label className="block text-[11px] font-bold text-slate-600">
@@ -3589,6 +3626,10 @@ if (
                         </th>
 
                         <th className="p-3">
+                          Descripción
+                        </th>
+
+                        <th className="p-3">
                           Precio
                         </th>
 
@@ -3643,6 +3684,13 @@ if (
                               {p.category}
                             </td>
 
+                            <td
+                              className="p-3 text-slate-500 max-w-xs truncate"
+                              title={p.description || ''}
+                            >
+                              {p.description || 'Sin descripción'}
+                            </td>
+
                             <td className="p-3 font-bold text-slate-800">
                               ${p.price.toFixed(2)}
                             </td>
@@ -3690,7 +3738,7 @@ if (
                       ).length === 0 && (
                         <tr>
                           <td
-                            colSpan={5}
+                            colSpan={6}
                             className="p-10 text-center text-slate-400"
                           >
                             No hay productos para mostrar.
@@ -4098,6 +4146,17 @@ if (
                   <select value={editCategory} onChange={e => setEditCategory(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold">
                     {categoriesList.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Descripción del plato</label>
+                    <textarea
+                      value={editDescription}
+                      onChange={e => setEditDescription(e.target.value)}
+                      maxLength={500}
+                      rows={3}
+                      placeholder="Describe brevemente el plato..."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs resize-none"
+                    />
+                  </div>
                   <div>
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">Imagen</label>
                     {editImage ? <img src={editImage} alt="Vista previa" className="w-full h-32 object-cover rounded-2xl border" /> : null}
