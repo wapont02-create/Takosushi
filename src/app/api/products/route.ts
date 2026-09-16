@@ -14,7 +14,8 @@ export async function GET() {
           taxable,
           category,
           cost_price,
-          image_url
+          image_url,
+          description
         FROM products
         ORDER BY id DESC
       `);
@@ -30,6 +31,7 @@ export async function GET() {
           taxable: p.taxable !== undefined ? Boolean(p.taxable) : true,
           category: p.category || 'General',
           costPrice: Number(p.cost_price || 0),
+          description: p.description || '',
 
           // IMPORTANTE:
           // La BD usa image_url
@@ -64,6 +66,7 @@ export async function POST(request: Request) {
       barcode,
       category,
       costPrice,
+      description,
 
       // Aceptamos image desde el frontend
       // y también image_url por compatibilidad
@@ -96,6 +99,9 @@ export async function POST(request: Request) {
     const finalCost =
       costPrice !== undefined ? Number(costPrice) : 0;
 
+    const finalDescription =
+      String(description || '').trim();
+
     // ==================================================
     // AQUÍ ESTÁ LA CORRECCIÓN PRINCIPAL
     // ==================================================
@@ -106,6 +112,7 @@ export async function POST(request: Request) {
     const cleanName = String(name).replace(/'/g, "''");
     const cleanBarcode = String(generatedBarcode).replace(/'/g, "''");
     const cleanCategory = String(finalCategory).replace(/'/g, "''");
+    const cleanDescription = finalDescription.replace(/'/g, "''");
     const cleanImageUrl = finalImageUrl.replace(/'/g, "''");
 
     await runQuery(async (db) => {
@@ -118,7 +125,8 @@ export async function POST(request: Request) {
           taxable,
           category,
           cost_price,
-          image_url
+          image_url,
+          description
         )
         VALUES (
           '${cleanName}',
@@ -128,7 +136,8 @@ export async function POST(request: Request) {
           ${finalTaxable},
           '${cleanCategory}',
           ${finalCost},
-          '${cleanImageUrl}'
+          '${cleanImageUrl}',
+          '${cleanDescription}'
         )
       `);
     });
@@ -138,6 +147,7 @@ export async function POST(request: Request) {
       message: 'Producto registrado con éxito',
       image: finalImageUrl,
       image_url: finalImageUrl,
+      description: finalDescription,
     });
   } catch (error: any) {
     console.error('Error en POST /api/products:', error);
