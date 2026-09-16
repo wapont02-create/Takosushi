@@ -1,3 +1,4 @@
+```ts
 import { NextResponse } from 'next/server';
 import { runQuery } from '../../../db/client';
 
@@ -14,7 +15,8 @@ export async function GET() {
           taxable,
           category,
           cost_price,
-          image_url
+          image_url,
+          description
         FROM products
         ORDER BY id DESC
       `);
@@ -35,6 +37,9 @@ export async function GET() {
           // La BD usa image_url
           // El frontend usa image
           image: p.image_url || '',
+
+          // Descripción del producto
+          description: p.description || '',
         }))
       : [];
 
@@ -69,6 +74,9 @@ export async function POST(request: Request) {
       // y también image_url por compatibilidad
       image,
       image_url,
+
+      // Nueva descripción
+      description,
     } = body;
 
     if (!name || price === undefined || price === null) {
@@ -97,16 +105,23 @@ export async function POST(request: Request) {
       costPrice !== undefined ? Number(costPrice) : 0;
 
     // ==================================================
-    // AQUÍ ESTÁ LA CORRECCIÓN PRINCIPAL
+    // IMAGEN
     // ==================================================
     const finalImageUrl =
       String(image_url || image || '').trim();
+
+    // ==================================================
+    // DESCRIPCIÓN
+    // ==================================================
+    const finalDescription =
+      String(description || '').trim();
 
     // Escapamos valores de texto para SQLite
     const cleanName = String(name).replace(/'/g, "''");
     const cleanBarcode = String(generatedBarcode).replace(/'/g, "''");
     const cleanCategory = String(finalCategory).replace(/'/g, "''");
     const cleanImageUrl = finalImageUrl.replace(/'/g, "''");
+    const cleanDescription = finalDescription.replace(/'/g, "''");
 
     await runQuery(async (db) => {
       return await db.sql(`
@@ -118,7 +133,8 @@ export async function POST(request: Request) {
           taxable,
           category,
           cost_price,
-          image_url
+          image_url,
+          description
         )
         VALUES (
           '${cleanName}',
@@ -128,7 +144,8 @@ export async function POST(request: Request) {
           ${finalTaxable},
           '${cleanCategory}',
           ${finalCost},
-          '${cleanImageUrl}'
+          '${cleanImageUrl}',
+          '${cleanDescription}'
         )
       `);
     });
@@ -138,6 +155,7 @@ export async function POST(request: Request) {
       message: 'Producto registrado con éxito',
       image: finalImageUrl,
       image_url: finalImageUrl,
+      description: finalDescription,
     });
   } catch (error: any) {
     console.error('Error en POST /api/products:', error);
@@ -152,3 +170,4 @@ export async function POST(request: Request) {
     );
   }
 }
+```
