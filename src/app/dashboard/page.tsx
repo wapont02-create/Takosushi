@@ -508,6 +508,15 @@ export default function DashboardPOS() {
   const [exchangeRate, setExchangeRate] =
     useState<number>(778.33);
 
+  const [isSavingExchangeRate, setIsSavingExchangeRate] =
+    useState(false);
+
+  const [exchangeRateMessage, setExchangeRateMessage] =
+    useState('');
+
+  const [exchangeRateSource, setExchangeRateSource] =
+    useState<string | null>(null);
+
   const [currentUsername, setCurrentUsername] =
     useState<string>('');
 
@@ -894,6 +903,119 @@ export default function DashboardPOS() {
   };
 
   /* ============================================================
+     TASA DE CAMBIO
+  ============================================================ */
+
+  const loadExchangeRate = async () => {
+    try {
+      const res = await fetch('/api/exchange-rate', {
+        method: 'GET',
+        cache: 'no-store'
+      });
+
+      const data = await readJson(res);
+      const parsedRate = Number(data.rate);
+
+      if (
+        data.success &&
+        Number.isFinite(parsedRate) &&
+        parsedRate > 0
+      ) {
+        setExchangeRate(parsedRate);
+        setExchangeRateSource(
+          data.source || null
+        );
+        return;
+      }
+
+      setExchangeRateSource(
+        data.source || null
+      );
+    } catch (error) {
+      console.error(
+        'Error cargando la tasa de cambio:',
+        error
+      );
+    }
+  };
+
+  const handleSaveExchangeRate = async () => {
+    const rate = Number(exchangeRate);
+
+    if (
+      !Number.isFinite(rate) ||
+      rate <= 0
+    ) {
+      alert('Ingresa una tasa de cambio válida.');
+      return;
+    }
+
+    if (!authenticatedUserId) {
+      alert(
+        'No se pudo identificar al usuario autenticado.'
+      );
+      return;
+    }
+
+    setIsSavingExchangeRate(true);
+    setExchangeRateMessage('');
+
+    try {
+      const res = await fetch('/api/exchange-rate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          rate,
+          userId: authenticatedUserId
+        })
+      });
+
+      const data = await readJson(res);
+
+      if (!res.ok || !data.success) {
+        throw new Error(
+          data.error ||
+          data.message ||
+          'No se pudo guardar la tasa.'
+        );
+      }
+
+      const savedRate = Number(data.rate);
+
+      if (
+        Number.isFinite(savedRate) &&
+        savedRate > 0
+      ) {
+        setExchangeRate(savedRate);
+      }
+
+      setExchangeRateSource(
+        data.source || 'manual'
+      );
+
+      setExchangeRateMessage(
+        'Tasa guardada correctamente en SQLite Cloud.'
+      );
+
+      await loadExchangeRate();
+    } catch (error: any) {
+      console.error(
+        'Error guardando tasa de cambio:',
+        error
+      );
+
+      setExchangeRateMessage(
+        error?.message ||
+        'No se pudo guardar la tasa.'
+      );
+    } finally {
+      setIsSavingExchangeRate(false);
+    }
+  };
+
+  /* ============================================================
      CARGA INICIAL
   ============================================================ */
 
@@ -968,17 +1090,7 @@ export default function DashboardPOS() {
         }
       }
 
-      const savedBcv =
-        localStorage.getItem('pos_bcv');
-
-      if (savedBcv) {
-        const parsedBcv =
-          parseFloat(savedBcv);
-
-        if (!isNaN(parsedBcv)) {
-          setExchangeRate(parsedBcv);
-        }
-      }
+      loadExchangeRate();
     }
   }, [isMounted, authenticatedUserId]);
 
@@ -2857,6 +2969,84 @@ if (
                 </div>
               </div>
 
+            </div>
+
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm max-w-3xl mx-auto">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">
+                      💱
+                    </span>
+
+                    <h3 className="text-sm font-black text-slate-900">
+                      Tasa Oficial BCV
+                    </h3>
+                  </div>
+
+                  <p className="text-[10px] font-bold text-blue-600 uppercase">
+                    {exchangeRateSource === 'manual'
+                      ? 'Manual'
+                      : exchangeRateSource
+                        ? exchangeRateSource
+                        : 'Sin registrar'}
+                  </p>
+
+                  <p className="text-xs text-slate-500">
+                    Tasa utilizada para convertir los precios USD a Bs.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-500">
+                      Bs.
+                    </span>
+
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={exchangeRate}
+                      onChange={e =>
+                        setExchangeRate(
+                          Number(e.target.value)
+                        )
+                      }
+                      className="w-full sm:w-36 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-black text-slate-800 focus:outline-none focus:border-blue-500 transition"
+                    />
+
+                    <span className="text-xs font-bold text-slate-500 whitespace-nowrap">
+                      / $1
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveExchangeRate}
+                    disabled={isSavingExchangeRate}
+                    className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-300 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition shadow-sm whitespace-nowrap"
+                  >
+                    {isSavingExchangeRate
+                      ? 'Guardando...'
+                      : 'Actualizar tasa'}
+                  </button>
+                </div>
+              </div>
+
+              {exchangeRateMessage && (
+                <div
+                  className={`mt-3 text-xs font-semibold ${
+                    exchangeRateMessage.includes(
+                      'correctamente'
+                    )
+                      ? 'text-emerald-600'
+                      : 'text-red-600'
+                  }`}
+                >
+                  {exchangeRateMessage}
+                </div>
+              )}
             </div>
           </div>
         )}
