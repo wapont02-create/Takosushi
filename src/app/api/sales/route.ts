@@ -52,8 +52,7 @@ export async function POST(request: Request) {
     }
 
     // ============================================================
-    // 3. VERIFICAR QUE LA CAJA EXISTA, ESTÉ ABIERTA
-    //    Y PERTENEZCA AL USUARIO
+    // 3. VERIFICAR CAJA ABIERTA Y DEL USUARIO
     // ============================================================
 
     const registerResult: any = await runQuery(async (db) => {
@@ -93,6 +92,17 @@ export async function POST(request: Request) {
     }
 
     const activeRegister = registerRows[0];
+    const activeRegisterId = Number(activeRegister.id);
+
+    if (!Number.isInteger(activeRegisterId) || activeRegisterId <= 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'La caja abierta no tiene un ID válido.'
+        },
+        { status: 400 }
+      );
+    }
 
     // ============================================================
     // 4. VALORES SEGUROS
@@ -102,7 +112,8 @@ export async function POST(request: Request) {
     const safeTotalBs = Number(totalBs) || 0;
     const safeExchangeRate = Number(exchangeRate) || 1;
     const safePaymentMethod = paymentMethod || 'Efectivo USD';
-    const safeDate = date || created_at || new Date().toISOString();
+    const safeDate =
+      date || created_at || new Date().toISOString();
 
     if (safeTotalUSD <= 0) {
       return NextResponse.json(
@@ -125,7 +136,7 @@ export async function POST(request: Request) {
     }
 
     // ============================================================
-    // 5. INSERTAR VENTA
+    // 5. INSERTAR VENTA Y OBTENER ID REAL
     // ============================================================
 
     const saleResult: any = await runQuery(async (db) => {
@@ -140,22 +151,32 @@ export async function POST(request: Request) {
           created_at
         )
         VALUES (?, ?, ?, ?, ?, ?)
+        RETURNING id
         `,
         safeTotalUSD,
         safePaymentMethod,
-        activeRegister.id,
+        activeRegisterId,
         safeTotalBs,
         safeExchangeRate,
         safeDate
       );
     });
 
-    const saleId = saleResult?.lastInsertRowid
-      ? Number(saleResult.lastInsertRowid)
-      : null;
+    const saleRows = Array.isArray(saleResult)
+      ? saleResult
+      : saleResult?.rows || [];
 
-    if (!saleId) {
-      throw new Error('No se pudo obtener el ID de la venta creada.');
+    const saleId = Number(saleRows[0]?.id);
+
+    if (!Number.isInteger(saleId) || saleId <= 0) {
+      console.error(
+        'Respuesta inesperada al crear venta:',
+        saleResult
+      );
+
+      throw new Error(
+        'La venta fue creada, pero no se pudo obtener su ID.'
+      );
     }
 
     // ============================================================
@@ -169,22 +190,34 @@ export async function POST(request: Request) {
       const price = Number(item.price || item.price_usd);
 
       if (!Number.isInteger(productId) || productId <= 0) {
-        throw new Error('La venta contiene un producto inválido.');
+        throw new Error(
+          'La venta contiene un producto inválido.'
+        );
       }
 
       if (!Number.isInteger(quantity) || quantity <= 0) {
-        throw new Error(`Cantidad inválida para el producto ${productId}.`);
+        throw new Error(
+          `Cantidad inválida para el producto ${productId}.`
+        );
       }
 
       if (!Number.isFinite(price) || price < 0) {
-        throw new Error(`Precio inválido para el producto ${productId}.`);
+        throw new Error(
+          `Precio inválido para el producto ${productId}.`
+        );
       }
 
+      // ----------------------------------------------------------
       // Verificar stock antes de descontar
+      // ----------------------------------------------------------
+
       const productResult: any = await runQuery(async (db) => {
         return await db.sql(
           `
-          SELECT id, name, stock
+          SELECT
+            id,
+            name,
+            stock
           FROM products
           WHERE id = ?
           LIMIT 1
@@ -198,7 +231,9 @@ export async function POST(request: Request) {
         : productResult?.rows || [];
 
       if (productRows.length === 0) {
-        throw new Error(`El producto con ID ${productId} no existe.`);
+        throw new Error(
+          `El producto con ID ${productId} no existe.`
+        );
       }
 
       const product = productRows[0];
@@ -210,7 +245,10 @@ export async function POST(request: Request) {
         );
       }
 
-      // Registrar detalle
+      // ----------------------------------------------------------
+      // Registrar detalle de venta
+      // ----------------------------------------------------------
+
       await runQuery(async (db) => {
         return await db.sql(
           `
@@ -229,7 +267,10 @@ export async function POST(request: Request) {
         );
       });
 
+      // ----------------------------------------------------------
       // Descontar stock
+      // ----------------------------------------------------------
+
       await runQuery(async (db) => {
         return await db.sql(
           `
@@ -244,13 +285,13 @@ export async function POST(request: Request) {
     }
 
     // ============================================================
-    // 7. RESPUESTA
+    // 7. RESPUESTA FINAL
     // ============================================================
 
     return NextResponse.json({
       success: true,
       saleId,
-      cashRegisterId: activeRegister.id,
+      cashRegisterId: activeRegisterId,
       userId: parsedUserId,
       message: 'Venta registrada con éxito'
     });
