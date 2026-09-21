@@ -1384,13 +1384,12 @@ export default function DashboardPOS() {
         const salesData =
           await salesRes.json();
 
-        if (
-          Array.isArray(
-            salesData
-          )
-        ) {
-          const formattedSales =
-            salesData.map(
+       if (
+  salesData?.success &&
+  Array.isArray(salesData.sales)
+) {
+  const formattedSales =
+    salesData.sales.map(
               (sale: any) => ({
                 id: Number(
                   sale.id
