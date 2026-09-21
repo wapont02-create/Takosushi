@@ -22,26 +22,41 @@ export default function ClientMenu({
   initialCategories: MenuCategory[];
 }) {
   const [cart, setCart] = useState<
-    { id: number; name: string; price: number; quantity: number }[]
+    {
+      id: number;
+      name: string;
+      price: number;
+      quantity: number;
+    }[]
   >([]);
 
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
 
-  const [orderType, setOrderType] = useState('Local / Mesa');
-  const [deliveryZone, setDeliveryZone] = useState('Guarenas');
-  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [orderType, setOrderType] =
+    useState('Local / Mesa');
+
+  const [deliveryZone, setDeliveryZone] =
+    useState('Guarenas');
+
+  const [deliveryAddress, setDeliveryAddress] =
+    useState('');
 
   const [paymentMethod, setPaymentMethod] =
     useState('Efectivo / Divisas');
 
   // Tasa de respaldo por si todavía no existe una tasa registrada.
-  const [exchangeRate, setExchangeRate] = useState(778.33);
-  const [isLoadingExchangeRate, setIsLoadingExchangeRate] =
-    useState(true);
+  const [exchangeRate, setExchangeRate] =
+    useState(778.33);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [
+    isLoadingExchangeRate,
+    setIsLoadingExchangeRate,
+  ] = useState(true);
+
+  const [isSubmitting, setIsSubmitting] =
+    useState(false);
 
   // ============================================================
   // CARGAR TASA ACTUAL DESDE LA BASE DE DATOS
@@ -54,10 +69,13 @@ export default function ClientMenu({
       try {
         setIsLoadingExchangeRate(true);
 
-        const response = await fetch('/api/exchange-rate', {
-          method: 'GET',
-          cache: 'no-store',
-        });
+        const response = await fetch(
+          '/api/exchange-rate',
+          {
+            method: 'GET',
+            cache: 'no-store',
+          }
+        );
 
         const data = await response.json();
 
@@ -67,7 +85,9 @@ export default function ClientMenu({
           data?.success &&
           Number(data.rate) > 0
         ) {
-          setExchangeRate(Number(data.rate));
+          setExchangeRate(
+            Number(data.rate)
+          );
         }
       } catch (error) {
         console.error(
@@ -102,7 +122,8 @@ export default function ClientMenu({
   const addToCart = (product: MenuItem) => {
     setCart((prev) => {
       const existing = prev.find(
-        (item) => item.id === product.id
+        (item) =>
+          item.id === product.id
       );
 
       if (existing) {
@@ -110,7 +131,8 @@ export default function ClientMenu({
           item.id === product.id
             ? {
                 ...item,
-                quantity: item.quantity + 1,
+                quantity:
+                  item.quantity + 1,
               }
             : item
         );
@@ -154,13 +176,15 @@ export default function ClientMenu({
   };
 
   const totalItems = cart.reduce(
-    (sum, item) => sum + item.quantity,
+    (sum, item) =>
+      sum + item.quantity,
     0
   );
 
   const subtotalPrice = cart.reduce(
     (sum, item) =>
-      sum + item.price * item.quantity,
+      sum +
+      item.price * item.quantity,
     0
   );
 
@@ -172,11 +196,13 @@ export default function ClientMenu({
       : 0;
 
   const totalPrice = (
-    subtotalPrice + deliveryCost
+    subtotalPrice +
+    deliveryCost
   ).toFixed(2);
 
   const totalBs = (
-    parseFloat(totalPrice) * exchangeRate
+    parseFloat(totalPrice) *
+    exchangeRate
   ).toFixed(2);
 
   // ============================================================
@@ -184,6 +210,13 @@ export default function ClientMenu({
   // ============================================================
 
   const checkoutWhatsApp = async () => {
+    if (cart.length === 0) {
+      alert(
+        'Agrega al menos un producto al carrito.'
+      );
+      return;
+    }
+
     if (
       !customerName.trim() ||
       !customerPhone.trim()
@@ -212,7 +245,10 @@ export default function ClientMenu({
       return;
     }
 
-    if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) {
+    if (
+      !Number.isFinite(exchangeRate) ||
+      exchangeRate <= 0
+    ) {
       alert(
         'No se pudo obtener una tasa de cambio válida.'
       );
@@ -222,35 +258,67 @@ export default function ClientMenu({
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/api/orders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          customerName,
-          orderType:
-            `${orderType} ${
+      const response = await fetch(
+        '/api/orders',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            customerName:
+              customerName.trim(),
+
+            customerPhone:
+              customerPhone.trim(),
+
+            customerDocument: '',
+
+            orderType,
+
+            deliveryZone:
               orderType === 'Delivery'
-                ? `(${deliveryZone})`
-                : ''
-            }`,
-          items: cart,
-          total: parseFloat(totalPrice),
-          totalBs: parseFloat(totalBs),
-          exchangeRate,
-          paymentMethod,
-        }),
-      });
+                ? deliveryZone
+                : '',
+
+            deliveryAddress:
+              orderType === 'Delivery'
+                ? deliveryAddress.trim()
+                : '',
+
+            items: cart,
+
+            total:
+              parseFloat(totalPrice),
+
+            totalBs:
+              parseFloat(totalBs),
+
+            exchangeRate,
+
+            paymentMethod,
+
+            created_at:
+              new Date().toISOString(),
+          }),
+        }
+      );
 
       const data = await response.json();
 
-      if (!response.ok) {
+      if (!response.ok || !data?.success) {
         throw new Error(
-          data.error ||
-            'Error al registrar en el sistema'
+          data?.message ||
+            data?.error ||
+            'Error al registrar el pedido.'
         );
       }
+
+      console.log(
+        'Pedido web registrado:',
+        data
+      );
     } catch (error: any) {
       console.error(
         'Error al registrar pedido:',
@@ -258,8 +326,9 @@ export default function ClientMenu({
       );
 
       alert(
-        'Hubo un problema al registrar en la base de datos: ' +
-          error.message
+        'Hubo un problema al registrar el pedido: ' +
+          (error?.message ||
+            'Error desconocido.')
       );
 
       setIsSubmitting(false);
@@ -268,7 +337,12 @@ export default function ClientMenu({
       setIsSubmitting(false);
     }
 
-    const phone = '584143065287';
+    // ========================================================
+    // WHATSAPP
+    // ========================================================
+
+    const phone =
+      '584143065287';
 
     let message =
       `🍣 *NUEVO PEDIDO - TAKOSUSHI* 🍣\n\n`;
@@ -276,9 +350,9 @@ export default function ClientMenu({
     message += `👤 *Cliente:* ${customerName}\n`;
     message += `📞 *Teléfono:* ${customerPhone}\n`;
 
-    message += `📍 *Servicio:* ${orderType} ${
+    message += `📍 *Servicio:* ${orderType}${
       orderType === 'Delivery'
-        ? `(${deliveryZone})`
+        ? ` (${deliveryZone})`
         : ''
     }\n`;
 
@@ -287,17 +361,20 @@ export default function ClientMenu({
     }
 
     message += `💳 *Pago:* ${paymentMethod}\n`;
-    message += `-----------------------------------\n`;
+    message +=
+      `-----------------------------------\n`;
 
     cart.forEach((item) => {
       message += `• ${item.quantity}x ${
         item.name
       } ($${(
-        item.price * item.quantity
+        item.price *
+        item.quantity
       ).toFixed(2)})\n`;
     });
 
-    message += `-----------------------------------\n`;
+    message +=
+      `-----------------------------------\n`;
 
     if (orderType === 'Delivery') {
       message += `🛵 *Delivery:* $${deliveryCost.toFixed(
@@ -315,12 +392,14 @@ export default function ClientMenu({
       `https://wa.me/${phone}?text=` +
       encodeURIComponent(message);
 
-    window.open(encodedURL, '_blank');
+    window.open(
+      encodedURL,
+      '_blank'
+    );
   };
 
   return (
     <div className="flex flex-col min-h-screen justify-between w-full">
-
       {/* HEADER */}
       <header className="border-b border-pink-900/40 px-6 py-4 flex justify-between items-center bg-[#1a0008]/90 backdrop-blur-md sticky top-0 z-40">
         <div className="flex items-center gap-3">
@@ -342,7 +421,6 @@ export default function ClientMenu({
         </div>
 
         <div className="flex items-center gap-3">
-
           <Link
             href="/login"
             className="text-xs font-semibold text-pink-300 hover:text-white border border-pink-900 bg-pink-950/60 px-3 py-1.5 rounded-xl transition"
@@ -358,15 +436,12 @@ export default function ClientMenu({
           >
             🛒 Carrito ({totalItems})
           </button>
-
         </div>
       </header>
 
       {/* CONTENIDO */}
       <main className="max-w-5xl mx-auto px-4 py-8 w-full flex-1">
-
         <div className="text-center mb-10">
-
           <span className="bg-[#ff007f]/20 text-pink-300 border border-[#ff007f]/40 text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-widest">
             ✨ Menú Digital en Vivo
           </span>
@@ -378,147 +453,133 @@ export default function ClientMenu({
           <p className="text-pink-200/80 text-xs sm:text-sm max-w-md mx-auto">
             Pide directo a tu casa en Guarenas y Guatire o ven a retirar.
           </p>
-
         </div>
 
-        {initialCategories.length === 0 ? (
-
+        {initialCategories.length ===
+        0 ? (
           <div className="text-center py-20 text-pink-300/60">
             <p className="text-xl">
               Cargando menú desde el sistema...
             </p>
           </div>
-
         ) : (
+          initialCategories.map(
+            (cat, idx) => (
+              <div
+                key={idx}
+                className="mb-12"
+              >
+                <div className="bg-[#ff007f] text-white font-black text-lg sm:text-xl py-2.5 px-5 rounded-2xl mb-6 shadow-lg uppercase tracking-wider transform -rotate-1">
+                  {cat.category}
+                </div>
 
-          initialCategories.map((cat, idx) => (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {cat.items.map(
+                    (
+                      product: MenuItem
+                    ) => {
+                      const imageUrl =
+                        typeof product.image ===
+                        'string'
+                          ? product.image.trim()
+                          : '';
 
-            <div
-              key={idx}
-              className="mb-12"
-            >
-
-              <div className="bg-[#ff007f] text-white font-black text-lg sm:text-xl py-2.5 px-5 rounded-2xl mb-6 shadow-lg uppercase tracking-wider transform -rotate-1">
-                {cat.category}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                {cat.items.map(
-                  (product: MenuItem) => {
-
-                    const imageUrl =
-                      typeof product.image ===
-                      'string'
-                        ? product.image.trim()
-                        : '';
-
-                    return (
-                      <div
-                        key={product.id}
-                        className="bg-[#1f030d] border border-pink-900/50 rounded-3xl overflow-hidden flex flex-col shadow-xl"
-                      >
-
-                        {/* IMAGEN */}
-                        <div className="w-full h-48 sm:h-56 bg-black/50 relative overflow-hidden border-b border-pink-900/40 flex-shrink-0">
-
-                          {imageUrl &&
-                          imageUrl !== 'NULL' &&
-                          imageUrl !==
-                            'EMPTY_STRING' ? (
-
-                            <img
-                              src={imageUrl}
-                              alt={product.name}
-                              className="w-full h-full object-cover hover:scale-105 transition duration-500"
-                              onError={(e) => {
-                                e.currentTarget.style.display =
-                                  'none';
-
-                                const parent =
-                                  e.currentTarget
-                                    .parentElement;
-
-                                if (parent) {
-                                  parent.innerHTML = `
-                                    <div class="w-full h-full bg-[#140005] flex items-center justify-center text-pink-500/40 text-xs font-medium tracking-widest uppercase">
-                                      📷 Sin imagen disponible
-                                    </div>
-                                  `;
+                      return (
+                        <div
+                          key={product.id}
+                          className="bg-[#1f030d] border border-pink-900/50 rounded-3xl overflow-hidden flex flex-col shadow-xl"
+                        >
+                          {/* IMAGEN */}
+                          <div className="w-full h-48 sm:h-56 bg-black/50 relative overflow-hidden border-b border-pink-900/40 flex-shrink-0">
+                            {imageUrl &&
+                            imageUrl !==
+                              'NULL' &&
+                            imageUrl !==
+                              'EMPTY_STRING' ? (
+                              <img
+                                src={imageUrl}
+                                alt={
+                                  product.name
                                 }
-                              }}
-                            />
+                                className="w-full h-full object-cover hover:scale-105 transition duration-500"
+                                onError={(
+                                  e
+                                ) => {
+                                  e.currentTarget.style.display =
+                                    'none';
 
-                          ) : (
+                                  const parent =
+                                    e
+                                      .currentTarget
+                                      .parentElement;
 
-                            <div className="w-full h-full bg-[#140005] flex items-center justify-center text-pink-500/40 text-xs font-medium tracking-widest uppercase">
-                              📷 Sin imagen disponible
+                                  if (
+                                    parent
+                                  ) {
+                                    parent.innerHTML = `
+                                      <div class="w-full h-full bg-[#140005] flex items-center justify-center text-pink-500/40 text-xs font-medium tracking-widest uppercase">
+                                        📷 Sin imagen disponible
+                                      </div>
+                                    `;
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-[#140005] flex items-center justify-center text-pink-500/40 text-xs font-medium tracking-widest uppercase">
+                                📷 Sin imagen disponible
+                              </div>
+                            )}
+                          </div>
+
+                          {/* CONTENIDO */}
+                          <div className="p-5 flex-1 flex flex-col justify-between gap-4">
+                            <div>
+                              <h3 className="text-yellow-400 font-extrabold text-base sm:text-lg uppercase tracking-wide mb-1.5">
+                                {product.name}
+                              </h3>
+
+                              <p className="text-pink-100/70 text-xs sm:text-sm leading-relaxed">
+                                {product.description ||
+                                  'Delicioso plato preparado al momento con los mejores ingredientes.'}
+                              </p>
                             </div>
 
-                          )}
-
-                        </div>
-
-                        {/* CONTENIDO */}
-                        <div className="p-5 flex-1 flex flex-col justify-between gap-4">
-
-                          <div>
-
-                            <h3 className="text-yellow-400 font-extrabold text-base sm:text-lg uppercase tracking-wide mb-1.5">
-                              {product.name}
-                            </h3>
-
-                            <p className="text-pink-100/70 text-xs sm:text-sm leading-relaxed">
-                              {product.description ||
-                                'Delicioso plato preparado al momento con los mejores ingredientes.'}
-                            </p>
-
-                          </div>
-
-                          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-pink-950 mt-auto">
-
-                            <span className="bg-white text-slate-950 font-black px-3 py-1.5 rounded-xl text-base shadow-inner">
-                              $
-                              {product.price.toFixed(
-                                2
-                              )}
-                            </span>
-
-                            <button
-                              onClick={() =>
-                                addToCart(product)
-                              }
-                              className="bg-[#ff007f] hover:bg-pink-600 text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-[#ff007f]/30 transition active:scale-95 flex items-center gap-1.5"
-                            >
-                              <span>
-                                + Agregar al Carrito
+                            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-pink-950 mt-auto">
+                              <span className="bg-white text-slate-950 font-black px-3 py-1.5 rounded-xl text-base shadow-inner">
+                                $
+                                {product.price.toFixed(
+                                  2
+                                )}
                               </span>
-                            </button>
 
+                              <button
+                                onClick={() =>
+                                  addToCart(
+                                    product
+                                  )
+                                }
+                                className="bg-[#ff007f] hover:bg-pink-600 text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-[#ff007f]/30 transition active:scale-95 flex items-center gap-1.5"
+                              >
+                                <span>
+                                  + Agregar al Carrito
+                                </span>
+                              </button>
+                            </div>
                           </div>
-
                         </div>
-
-                      </div>
-                    );
-                  }
-                )}
-
+                      );
+                    }
+                  )}
+                </div>
               </div>
-
-            </div>
-
-          ))
-
+            )
+          )
         )}
-
       </main>
 
       {/* BARRA DEL CARRITO */}
       {totalItems > 0 && (
-
         <div className="fixed bottom-0 left-0 right-0 bg-[#1a0008]/95 border-t border-pink-900/60 p-4 backdrop-blur-lg z-40 flex justify-between items-center max-w-xl mx-auto sm:rounded-t-3xl shadow-2xl">
-
           <div>
             <p className="text-xs text-pink-300">
               {totalItems}{' '}
@@ -540,22 +601,15 @@ export default function ClientMenu({
           >
             🛒 Ver Pedido y Pagar
           </button>
-
         </div>
-
       )}
 
       {/* CARRITO */}
       {isCartOpen && (
-
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex justify-end">
-
           <div className="bg-[#1c020b] w-full max-w-md h-full p-6 flex flex-col justify-between border-l border-pink-900/50 shadow-2xl overflow-y-auto">
-
             <div>
-
               <div className="flex justify-between items-center pb-4 border-b border-pink-900/50 mb-4">
-
                 <h2 className="text-lg font-black text-yellow-400">
                   🛒 Tu Pedido
                 </h2>
@@ -568,13 +622,10 @@ export default function ClientMenu({
                 >
                   ✕ Cerrar
                 </button>
-
               </div>
 
               {cart.length === 0 ? (
-
                 <div className="text-center py-10 text-pink-300/60">
-
                   <p className="text-4xl mb-3">
                     🍣
                   </p>
@@ -582,82 +633,69 @@ export default function ClientMenu({
                   <p className="text-sm">
                     Tu carrito está vacío.
                   </p>
-
                 </div>
-
               ) : (
-
                 <div className="space-y-3 max-h-[30vh] overflow-y-auto pr-1 mb-4">
+                  {cart.map(
+                    (item) => (
+                      <div
+                        key={item.id}
+                        className="bg-[#140005] p-3 rounded-2xl border border-pink-950 flex justify-between items-center"
+                      >
+                        <div>
+                          <h4 className="font-bold text-xs text-yellow-200">
+                            {item.name}
+                          </h4>
 
-                  {cart.map((item) => (
+                          <p className="text-[11px] text-pink-400">
+                            $
+                            {item.price.toFixed(
+                              2
+                            )}{' '}
+                            c/u
+                          </p>
+                        </div>
 
-                    <div
-                      key={item.id}
-                      className="bg-[#140005] p-3 rounded-2xl border border-pink-950 flex justify-between items-center"
-                    >
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() =>
+                              updateQuantity(
+                                item.id,
+                                -1
+                              )
+                            }
+                            className="bg-pink-950 w-7 h-7 rounded-lg font-bold text-xs hover:bg-pink-900 flex items-center justify-center"
+                          >
+                            -
+                          </button>
 
-                      <div>
+                          <span className="font-bold text-xs w-4 text-center">
+                            {item.quantity}
+                          </span>
 
-                        <h4 className="font-bold text-xs text-yellow-200">
-                          {item.name}
-                        </h4>
-
-                        <p className="text-[11px] text-pink-400">
-                          ${item.price.toFixed(2)} c/u
-                        </p>
-
+                          <button
+                            onClick={() =>
+                              updateQuantity(
+                                item.id,
+                                1
+                              )
+                            }
+                            className="bg-pink-950 w-7 h-7 rounded-lg font-bold text-xs hover:bg-pink-900 flex items-center justify-center"
+                          >
+                            +
+                          </button>
+                        </div>
                       </div>
-
-                      <div className="flex items-center gap-2">
-
-                        <button
-                          onClick={() =>
-                            updateQuantity(
-                              item.id,
-                              -1
-                            )
-                          }
-                          className="bg-pink-950 w-7 h-7 rounded-lg font-bold text-xs hover:bg-pink-900 flex items-center justify-center"
-                        >
-                          -
-                        </button>
-
-                        <span className="font-bold text-xs w-4 text-center">
-                          {item.quantity}
-                        </span>
-
-                        <button
-                          onClick={() =>
-                            updateQuantity(
-                              item.id,
-                              1
-                            )
-                          }
-                          className="bg-pink-950 w-7 h-7 rounded-lg font-bold text-xs hover:bg-pink-900 flex items-center justify-center"
-                        >
-                          +
-                        </button>
-
-                      </div>
-
-                    </div>
-
-                  ))}
-
+                    )
+                  )}
                 </div>
-
               )}
-
             </div>
 
             {cart.length > 0 && (
-
               <div className="border-t border-pink-900/50 pt-4 space-y-3">
-
                 <div className="grid grid-cols-2 gap-2">
-
                   <div>
-
                     <label className="block text-[10px] font-semibold text-pink-300 mb-1">
                       Tu Nombre:
                     </label>
@@ -665,7 +703,9 @@ export default function ClientMenu({
                     <input
                       type="text"
                       placeholder="Ej. Carlos Pérez"
-                      value={customerName}
+                      value={
+                        customerName
+                      }
                       onChange={(e) =>
                         setCustomerName(
                           e.target.value
@@ -673,11 +713,9 @@ export default function ClientMenu({
                       }
                       className="w-full bg-[#140005] border border-pink-900 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ff007f]"
                     />
-
                   </div>
 
                   <div>
-
                     <label className="block text-[10px] font-semibold text-pink-300 mb-1">
                       Teléfono:
                     </label>
@@ -685,7 +723,9 @@ export default function ClientMenu({
                     <input
                       type="text"
                       placeholder="0412-0000000"
-                      value={customerPhone}
+                      value={
+                        customerPhone
+                      }
                       onChange={(e) =>
                         setCustomerPhone(
                           e.target.value
@@ -693,13 +733,10 @@ export default function ClientMenu({
                       }
                       className="w-full bg-[#140005] border border-pink-900 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ff007f]"
                     />
-
                   </div>
-
                 </div>
 
                 <div>
-
                   <label className="block text-[10px] font-semibold text-pink-300 mb-1">
                     Tipo de Servicio:
                   </label>
@@ -725,22 +762,20 @@ export default function ClientMenu({
                       🛵 Delivery a Domicilio
                     </option>
                   </select>
-
                 </div>
 
                 {orderType ===
                   'Delivery' && (
-
                   <div className="space-y-2 bg-[#140005] p-3 rounded-xl border border-pink-950">
-
                     <div>
-
                       <label className="block text-[10px] font-semibold text-pink-300 mb-1">
                         Zona de Delivery:
                       </label>
 
                       <select
-                        value={deliveryZone}
+                        value={
+                          deliveryZone
+                        }
                         onChange={(e) =>
                           setDeliveryZone(
                             e.target.value
@@ -756,11 +791,9 @@ export default function ClientMenu({
                           Guatire ($3.00)
                         </option>
                       </select>
-
                     </div>
 
                     <div>
-
                       <label className="block text-[10px] font-semibold text-pink-300 mb-1">
                         Dirección Exacta:
                       </label>
@@ -778,20 +811,19 @@ export default function ClientMenu({
                         }
                         className="w-full bg-[#1a0008] border border-pink-900 rounded-lg px-2 py-1.5 text-xs text-white"
                       />
-
                     </div>
-
                   </div>
                 )}
 
                 <div>
-
                   <label className="block text-[10px] font-semibold text-pink-300 mb-1">
                     Método de Pago:
                   </label>
 
                   <select
-                    value={paymentMethod}
+                    value={
+                      paymentMethod
+                    }
                     onChange={(e) =>
                       setPaymentMethod(
                         e.target.value
@@ -811,36 +843,41 @@ export default function ClientMenu({
                       🌐 Zelle / Binance
                     </option>
                   </select>
-
                 </div>
 
                 <div className="bg-[#140005] p-3 rounded-xl border border-pink-950 space-y-1 text-xs">
-
                   <div className="flex justify-between text-pink-300/80">
-                    <span>Subtotal:</span>
                     <span>
-                      ${subtotalPrice.toFixed(2)}
+                      Subtotal:
+                    </span>
+
+                    <span>
+                      $
+                      {subtotalPrice.toFixed(
+                        2
+                      )}
                     </span>
                   </div>
 
                   {orderType ===
                     'Delivery' && (
-
                     <div className="flex justify-between text-pink-300/80">
-
                       <span>
-                        Delivery ({deliveryZone}):
+                        Delivery (
+                        {deliveryZone}
+                        ):
                       </span>
 
                       <span>
-                        ${deliveryCost.toFixed(2)}
+                        $
+                        {deliveryCost.toFixed(
+                          2
+                        )}
                       </span>
-
                     </div>
                   )}
 
                   <div className="flex justify-between font-black text-sm text-yellow-400 pt-2 border-t border-pink-900/40">
-
                     <span>
                       Total USD:
                     </span>
@@ -848,11 +885,9 @@ export default function ClientMenu({
                     <span>
                       ${totalPrice}
                     </span>
-
                   </div>
 
                   <div className="flex justify-between font-bold text-pink-200">
-
                     <span>
                       Total Bolívares (
                       {isLoadingExchangeRate
@@ -869,13 +904,13 @@ export default function ClientMenu({
                         ? '...'
                         : totalBs}
                     </span>
-
                   </div>
-
                 </div>
 
                 <button
-                  onClick={checkoutWhatsApp}
+                  onClick={
+                    checkoutWhatsApp
+                  }
                   disabled={
                     isSubmitting ||
                     isLoadingExchangeRate
@@ -888,12 +923,9 @@ export default function ClientMenu({
                     ? 'Actualizando tasa...'
                     : '🟢 Enviar Pedido por WhatsApp'}
                 </button>
-
               </div>
             )}
-
           </div>
-
         </div>
       )}
 
@@ -903,7 +935,6 @@ export default function ClientMenu({
           Takosushi • Guarenas y Guatire.
         </p>
       </footer>
-
     </div>
   );
 }
