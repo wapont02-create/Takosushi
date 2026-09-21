@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import RolesManagerModule from '../../components/RolesManagerModule';
+import WebOrdersModule from '../../components/WebOrdersModule';
 import { getRoles, getUsers } from '../../utils/rolesManager';
 import {
   LineChart,
@@ -81,14 +82,19 @@ type PayableAccount = {
 
 const IVA_RATE = 0.16;
 
-async function readJson<T = any>(response: Response): Promise<T> {
+async function readJson<T = any>(
+  response: Response
+): Promise<T> {
   const text = await response.text();
 
   try {
     return JSON.parse(text) as T;
   } catch {
     throw new Error(
-      `Respuesta inválida del servidor (${response.status}): ${text.slice(0, 200)}`
+      `Respuesta inválida del servidor (${response.status}): ${text.slice(
+        0,
+        200
+      )}`
     );
   }
 }
@@ -117,7 +123,9 @@ function POSCustomerSelector({
 
   useEffect(() => {
     if (query.length > 1) {
-      fetch(`/api/customers?q=${encodeURIComponent(query)}`)
+      fetch(
+        `/api/customers?q=${encodeURIComponent(query)}`
+      )
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) {
@@ -126,7 +134,10 @@ function POSCustomerSelector({
           }
         })
         .catch(err =>
-          console.error('Error buscando clientes:', err)
+          console.error(
+            'Error buscando clientes:',
+            err
+          )
         );
     } else {
       setResults([]);
@@ -145,7 +156,8 @@ function POSCustomerSelector({
       const res = await fetch('/api/customers', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type':
+            'application/json'
         },
         body: JSON.stringify({
           name: newName,
@@ -159,7 +171,8 @@ function POSCustomerSelector({
       if (data.success) {
         onSelectCustomer({
           name: newName,
-          document: newDoc || 'V-00000000',
+          document:
+            newDoc || 'V-00000000',
           phone: newPhone || 'N/A'
         });
 
@@ -169,13 +182,21 @@ function POSCustomerSelector({
         setNewDoc('');
         setNewPhone('');
 
-        alert('¡Cliente registrado y seleccionado!');
+        alert(
+          '¡Cliente registrado y seleccionado!'
+        );
       } else {
-        alert('Error: ' + (data.error || 'No se pudo registrar el cliente.'));
+        alert(
+          'Error: ' +
+            (data.error ||
+              'No se pudo registrar el cliente.')
+        );
       }
     } catch (err) {
       console.error(err);
-      alert('Error de red al registrar el cliente.');
+      alert(
+        'Error de red al registrar el cliente.'
+      );
     }
   };
 
@@ -194,48 +215,63 @@ function POSCustomerSelector({
             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 transition shadow-2xs"
           />
 
-          {showDropdown && results.length > 0 && (
-            <ul className="absolute z-20 w-full bg-white border border-slate-200 mt-1 shadow-xl max-h-40 overflow-y-auto rounded-xl text-xs">
-              {results.map((c: any) => (
-                <li
-                  key={c.id}
-                  className="p-2.5 hover:bg-blue-50 cursor-pointer border-b border-slate-100 flex justify-between items-center transition"
-                  onClick={() => {
-                    onSelectCustomer({
-                      name: c.name,
-                      document: c.rif_ci || 'N/A',
-                      phone: c.phone || 'N/A'
-                    });
+          {showDropdown &&
+            results.length > 0 && (
+              <ul className="absolute z-20 w-full bg-white border border-slate-200 mt-1 shadow-xl max-h-40 overflow-y-auto rounded-xl text-xs">
+                {results.map((c: any) => (
+                  <li
+                    key={c.id}
+                    className="p-2.5 hover:bg-blue-50 cursor-pointer border-b border-slate-100 flex justify-between items-center transition"
+                    onClick={() => {
+                      onSelectCustomer({
+                        name: c.name,
+                        document:
+                          c.rif_ci ||
+                          'N/A',
+                        phone:
+                          c.phone ||
+                          'N/A'
+                      });
 
-                    setQuery(c.name);
-                    setShowDropdown(false);
-                  }}
-                >
-                  <span className="font-bold text-slate-800">
-                    {c.name}
-                  </span>
+                      setQuery(c.name);
+                      setShowDropdown(
+                        false
+                      );
+                    }}
+                  >
+                    <span className="font-bold text-slate-800">
+                      {c.name}
+                    </span>
 
-                  <span className="text-slate-500">
-                    {c.rif_ci}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
+                    <span className="text-slate-500">
+                      {c.rif_ci}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
         </div>
 
         <button
           type="button"
-          onClick={() => setIsAddingNew(!isAddingNew)}
+          onClick={() =>
+            setIsAddingNew(
+              !isAddingNew
+            )
+          }
           className="bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 px-3 py-2.5 rounded-xl text-xs font-bold transition shadow-2xs"
         >
-          {isAddingNew ? 'Cancelar' : '+ Nuevo'}
+          {isAddingNew
+            ? 'Cancelar'
+            : '+ Nuevo'}
         </button>
       </div>
 
       {isAddingNew && (
         <form
-          onSubmit={handleRegisterQuickCustomer}
+          onSubmit={
+            handleRegisterQuickCustomer
+          }
           className="bg-blue-50/70 p-3.5 rounded-2xl border border-blue-200 space-y-2.5 animate-fadeIn"
         >
           <div className="text-[11px] font-extrabold text-blue-900">
@@ -247,7 +283,11 @@ function POSCustomerSelector({
             placeholder="Nombre y Apellido *"
             required
             value={newName}
-            onChange={e => setNewName(e.target.value)}
+            onChange={e =>
+              setNewName(
+                e.target.value
+              )
+            }
             className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs shadow-2xs"
           />
 
@@ -256,7 +296,11 @@ function POSCustomerSelector({
               type="text"
               placeholder="Cédula / RIF"
               value={newDoc}
-              onChange={e => setNewDoc(e.target.value)}
+              onChange={e =>
+                setNewDoc(
+                  e.target.value
+                )
+              }
               className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs shadow-2xs"
             />
 
@@ -264,7 +308,11 @@ function POSCustomerSelector({
               type="text"
               placeholder="Teléfono"
               value={newPhone}
-              onChange={e => setNewPhone(e.target.value)}
+              onChange={e =>
+                setNewPhone(
+                  e.target.value
+                )
+              }
               className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs shadow-2xs"
             />
           </div>
@@ -286,7 +334,8 @@ function POSCustomerSelector({
 ============================================================ */
 
 function CustomersDirectoryModule() {
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [customers, setCustomers] =
+    useState<any[]>([]);
   const [name, setName] = useState('');
   const [rifCi, setRifCi] = useState('');
   const [phone, setPhone] = useState('');
@@ -300,7 +349,9 @@ function CustomersDirectoryModule() {
           setCustomers(data);
         }
       })
-      .catch(err => console.error(err));
+      .catch(err =>
+        console.error(err)
+      );
   }, []);
 
   const handleSaveCustomer = async (
@@ -311,37 +362,48 @@ function CustomersDirectoryModule() {
     if (!name.trim()) return;
 
     try {
-      const res = await fetch('/api/customers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name,
-          rif_ci: rifCi,
-          phone,
-          address
-        })
-      });
+      const res = await fetch(
+        '/api/customers',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json'
+          },
+          body: JSON.stringify({
+            name,
+            rif_ci: rifCi,
+            phone,
+            address
+          })
+        }
+      );
 
       const data = await readJson(res);
 
       if (data.success) {
-        alert('¡Cliente guardado con éxito!');
+        alert(
+          '¡Cliente guardado con éxito!'
+        );
 
         setName('');
         setRifCi('');
         setPhone('');
         setAddress('');
 
-        const updated = await fetch('/api/customers')
-          .then(r => r.json());
+        const updated = await fetch(
+          '/api/customers'
+        ).then(r => r.json());
 
         if (Array.isArray(updated)) {
           setCustomers(updated);
         }
       } else {
-        alert('Error: ' + (data.error || 'No se pudo guardar.'));
+        alert(
+          'Error: ' +
+            (data.error ||
+              'No se pudo guardar.')
+        );
       }
     } catch (err) {
       console.error(err);
@@ -358,7 +420,8 @@ function CustomersDirectoryModule() {
           </h3>
 
           <p className="text-xs text-slate-500">
-            Base de datos de compradores para créditos y facturación rápida.
+            Base de datos de compradores para
+            créditos y facturación rápida.
           </p>
         </div>
 
@@ -376,7 +439,9 @@ function CustomersDirectoryModule() {
           placeholder="Nombre *"
           required
           value={name}
-          onChange={e => setName(e.target.value)}
+          onChange={e =>
+            setName(e.target.value)
+          }
           className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs shadow-2xs"
         />
 
@@ -384,7 +449,9 @@ function CustomersDirectoryModule() {
           type="text"
           placeholder="Cédula / RIF"
           value={rifCi}
-          onChange={e => setRifCi(e.target.value)}
+          onChange={e =>
+            setRifCi(e.target.value)
+          }
           className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs shadow-2xs"
         />
 
@@ -392,7 +459,9 @@ function CustomersDirectoryModule() {
           type="text"
           placeholder="Teléfono"
           value={phone}
-          onChange={e => setPhone(e.target.value)}
+          onChange={e =>
+            setPhone(e.target.value)
+          }
           className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs shadow-2xs"
         />
 
@@ -400,7 +469,9 @@ function CustomersDirectoryModule() {
           type="text"
           placeholder="Dirección"
           value={address}
-          onChange={e => setAddress(e.target.value)}
+          onChange={e =>
+            setAddress(e.target.value)
+          }
           className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs shadow-2xs"
         />
 
@@ -416,10 +487,18 @@ function CustomersDirectoryModule() {
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 uppercase font-bold text-[10px]">
-              <th className="p-3">Cliente</th>
-              <th className="p-3">Cédula / RIF</th>
-              <th className="p-3">Teléfono</th>
-              <th className="p-3">Dirección</th>
+              <th className="p-3">
+                Cliente
+              </th>
+              <th className="p-3">
+                Cédula / RIF
+              </th>
+              <th className="p-3">
+                Teléfono
+              </th>
+              <th className="p-3">
+                Dirección
+              </th>
             </tr>
           </thead>
 
@@ -435,28 +514,30 @@ function CustomersDirectoryModule() {
               </tr>
             )}
 
-            {customers.map((c, idx) => (
-              <tr
-                key={idx}
-                className="hover:bg-slate-50/60 transition"
-              >
-                <td className="p-3 font-bold text-slate-800">
-                  {c.name}
-                </td>
+            {customers.map(
+              (c, idx) => (
+                <tr
+                  key={idx}
+                  className="hover:bg-slate-50/60 transition"
+                >
+                  <td className="p-3 font-bold text-slate-800">
+                    {c.name}
+                  </td>
 
-                <td className="p-3 text-slate-600">
-                  {c.rif_ci || 'N/A'}
-                </td>
+                  <td className="p-3 text-slate-600">
+                    {c.rif_ci || 'N/A'}
+                  </td>
 
-                <td className="p-3 text-slate-600">
-                  {c.phone || 'N/A'}
-                </td>
+                  <td className="p-3 text-slate-600">
+                    {c.phone || 'N/A'}
+                  </td>
 
-                <td className="p-3 text-slate-600">
-                  {c.address || 'N/A'}
-                </td>
-              </tr>
-            ))}
+                  <td className="p-3 text-slate-600">
+                    {c.address || 'N/A'}
+                  </td>
+                </tr>
+              )
+            )}
           </tbody>
         </table>
       </div>
@@ -469,26 +550,30 @@ function CustomersDirectoryModule() {
 ============================================================ */
 
 export default function DashboardPOS() {
-  const [isMounted, setIsMounted] = useState(false);
+  const [isMounted, setIsMounted] =
+    useState(false);
 
-  const [activeTab, setActiveTab] = useState<
-    | 'welcome'
-    | 'pos'
-    | 'inventory'
-    | 'reports'
-    | 'accounts'
-    | 'customers'
-    | 'roles'
-  >('welcome');
+  const [activeTab, setActiveTab] =
+    useState<
+      | 'welcome'
+      | 'pos'
+      | 'inventory'
+      | 'reports'
+      | 'accounts'
+      | 'customers'
+      | 'roles'
+    >('welcome');
 
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] =
+    useState<Product[]>([]);
 
-  const [categoriesList, setCategoriesList] = useState<string[]>([
-    'Comida',
-    'Bebidas',
-    'COMBOS ESPECIALES',
-    'ROLLS FAVORITOS'
-  ]);
+  const [categoriesList, setCategoriesList] =
+    useState<string[]>([
+      'Comida',
+      'Bebidas',
+      'COMBOS ESPECIALES',
+      'ROLLS FAVORITOS'
+    ]);
 
   const [newCategoryInput, setNewCategoryInput] =
     useState('');
@@ -508,22 +593,28 @@ export default function DashboardPOS() {
   const [exchangeRate, setExchangeRate] =
     useState<number>(778.33);
 
-  const [isSavingExchangeRate, setIsSavingExchangeRate] =
-    useState(false);
+  const [
+    isSavingExchangeRate,
+    setIsSavingExchangeRate
+  ] = useState(false);
 
-  const [exchangeRateMessage, setExchangeRateMessage] =
-    useState('');
+  const [
+    exchangeRateMessage,
+    setExchangeRateMessage
+  ] = useState('');
 
-  const [exchangeRateSource, setExchangeRateSource] =
-    useState<string | null>(null);
+  const [
+    exchangeRateSource,
+    setExchangeRateSource
+  ] = useState<string | null>(null);
 
   const [currentUsername, setCurrentUsername] =
     useState<string>('');
 
-  // Usuario autenticado: viene de /login -> localStorage.pos_user.
-  // Este ID es la única identidad autorizada para caja y ventas.
-  const [authenticatedUser, setAuthenticatedUser] =
-    useState<any>(null);
+  const [
+    authenticatedUser,
+    setAuthenticatedUser
+  ] = useState<any>(null);
 
   const authenticatedUserId: number =
     Number(authenticatedUser?.id) || 0;
@@ -566,8 +657,10 @@ export default function DashboardPOS() {
      INVENTARIO
   ============================================================ */
 
-  const [isRestockModalOpen, setIsRestockModalOpen] =
-    useState(false);
+  const [
+    isRestockModalOpen,
+    setIsRestockModalOpen
+  ] = useState(false);
 
   const [
     selectedProductForRestock,
@@ -604,11 +697,19 @@ export default function DashboardPOS() {
   const [editImage, setEditImage] =
     useState('');
 
-  const [inventoryFilterMode, setInventoryFilterMode] =
-    useState<'all' | 'low'>('all');
+  const [
+    inventoryFilterMode,
+    setInventoryFilterMode
+  ] = useState<'all' | 'low'>(
+    'all'
+  );
 
-  const [reportFilterPeriod, setReportFilterPeriod] =
-    useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [
+    reportFilterPeriod,
+    setReportFilterPeriod
+  ] = useState<
+    'all' | 'today' | 'week' | 'month'
+  >('all');
 
   /* ============================================================
      CUENTAS
@@ -623,8 +724,10 @@ export default function DashboardPOS() {
   const [newPayableDesc, setNewPayableDesc] =
     useState('');
 
-  const [newPayableAmountUSD, setNewPayableAmountUSD] =
-    useState('');
+  const [
+    newPayableAmountUSD,
+    setNewPayableAmountUSD
+  ] = useState('');
 
   const [newDueDate, setNewDueDate] =
     useState('');
@@ -636,14 +739,18 @@ export default function DashboardPOS() {
   const [cart, setCart] =
     useState<CartItem[]>([]);
 
-  const [isCheckoutModalOpen, setIsCheckoutModalOpen] =
-    useState(false);
+  const [
+    isCheckoutModalOpen,
+    setIsCheckoutModalOpen
+  ] = useState(false);
 
   const [cashGivenUSD, setCashGivenUSD] =
     useState<string>('');
 
   const [paymentMethod, setPaymentMethod] =
-    useState<PaymentMethodType>('Efectivo USD');
+    useState<PaymentMethodType>(
+      'Efectivo USD'
+    );
 
   const [clientName, setClientName] =
     useState('');
@@ -659,6 +766,13 @@ export default function DashboardPOS() {
 
   const [selectedCategory, setSelectedCategory] =
     useState('Todos');
+
+  /* ============================================================
+     PEDIDO WEB CARGADO EN POS
+  ============================================================ */
+
+  const [loadedWebOrder, setLoadedWebOrder] =
+    useState<any | null>(null);
 
   /* ============================================================
      NUEVO PRODUCTO
@@ -691,8 +805,10 @@ export default function DashboardPOS() {
   const [selectedFileName, setSelectedFileName] =
     useState('');
 
-  const [isUploadingImage, setIsUploadingImage] =
-    useState(false);
+  const [
+    isUploadingImage,
+    setIsUploadingImage
+  ] = useState(false);
 
   /* ============================================================
      TICKET / ÉXITO
@@ -701,14 +817,16 @@ export default function DashboardPOS() {
   const [lastPrintedSale, setLastPrintedSale] =
     useState<any>(null);
 
-  const [successModalData, setSuccessModalData] =
-    useState<{
-      isOpen: boolean;
-      changeUSD: number;
-      changeBs: number;
-      isCredit: boolean;
-      clientName?: string;
-    } | null>(null);
+  const [
+    successModalData,
+    setSuccessModalData
+  ] = useState<{
+    isOpen: boolean;
+    changeUSD: number;
+    changeBs: number;
+    isCredit: boolean;
+    clientName?: string;
+  } | null>(null);
 
   /* ============================================================
      SUBIR IMAGEN
@@ -727,7 +845,9 @@ export default function DashboardPOS() {
     const file = files[0];
 
     if (!isEditMode) {
-      setSelectedFileName(file.name);
+      setSelectedFileName(
+        file.name
+      );
     }
 
     setIsUploadingImage(true);
@@ -736,10 +856,13 @@ export default function DashboardPOS() {
     formData.append('image', file);
 
     try {
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
+      const response = await fetch(
+        '/api/upload',
+        {
+          method: 'POST',
+          body: formData
+        }
+      );
 
       const data = await response.json();
 
@@ -752,11 +875,13 @@ export default function DashboardPOS() {
       } else {
         alert(
           'Error al subir la imagen: ' +
-          (data.error || 'Desconocido')
+            (data.error ||
+              'Desconocido')
         );
       }
     } catch (error) {
       console.error('Error:', error);
+
       alert(
         'Error de red al conectar con el servidor.'
       );
@@ -779,9 +904,15 @@ export default function DashboardPOS() {
     }
 
     const formattedCat =
-      newCategoryInput.trim().toUpperCase();
+      newCategoryInput
+        .trim()
+        .toUpperCase();
 
-    if (!categoriesList.includes(formattedCat)) {
+    if (
+      !categoriesList.includes(
+        formattedCat
+      )
+    ) {
       setCategoriesList(prev => [
         ...prev,
         formattedCat
@@ -805,7 +936,8 @@ export default function DashboardPOS() {
     (authenticatedUserId
       ? usersList.find(
           (u: any) =>
-            Number(u?.id) === authenticatedUserId
+            Number(u?.id) ===
+            authenticatedUserId
         )
       : undefined) ||
     authenticatedUser ||
@@ -840,67 +972,81 @@ export default function DashboardPOS() {
      VERIFICAR CAJA
   ============================================================ */
 
-  const checkCashRegisterStatus = async (
-    onOpenPOS = false
-  ) => {
-    try {
-      const userId = authenticatedUserId;
+  const checkCashRegisterStatus =
+    async (
+      onOpenPOS = false
+    ) => {
+      try {
+        const userId =
+          authenticatedUserId;
 
-      if (
-        !Number.isInteger(userId) ||
-        userId <= 0
-      ) {
+        if (
+          !Number.isInteger(
+            userId
+          ) ||
+          userId <= 0
+        ) {
+          console.error(
+            'Usuario actual inválido:',
+            currentUserObj
+          );
+          return;
+        }
+
+        const res = await fetch(
+          `/api/cash?userId=${userId}`,
+          {
+            method: 'GET',
+            cache: 'no-store'
+          }
+        );
+
+        const data =
+          await readJson(res);
+
+        if (
+          data.success &&
+          data.isOpen &&
+          data.register
+        ) {
+          const registerId =
+            Number(
+              data.register.id
+            );
+
+          setIsCashOpen(true);
+          setActiveRegisterId(
+            registerId
+          );
+
+          if (onOpenPOS) {
+            setActiveTab('pos');
+          }
+        } else {
+          setIsCashOpen(false);
+          setActiveRegisterId(
+            null
+          );
+
+          if (onOpenPOS) {
+            setShowOpenCashModal(
+              true
+            );
+          }
+        }
+      } catch (error) {
         console.error(
-          'Usuario actual inválido:',
-          currentUserObj
-        );
-        return;
-      }
-
-      const res = await fetch(
-        `/api/cash?userId=${userId}`,
-        {
-          method: 'GET',
-          cache: 'no-store'
-        }
-      );
-
-      const data = await readJson(res);
-
-      if (
-        data.success &&
-        data.isOpen &&
-        data.register
-      ) {
-        const registerId = Number(
-          data.register.id
+          'Error verificando estatus de caja:',
+          error
         );
 
-        setIsCashOpen(true);
-        setActiveRegisterId(registerId);
-
         if (onOpenPOS) {
-          setActiveTab('pos');
-        }
-      } else {
-        setIsCashOpen(false);
-        setActiveRegisterId(null);
-
-        if (onOpenPOS) {
-          setShowOpenCashModal(true);
+          setShowOpenCashModal(
+            true
+          );
         }
       }
-    } catch (error) {
-      console.error(
-        'Error verificando estatus de caja:',
-        error
-      );
-
-      if (onOpenPOS) {
-        setShowOpenCashModal(true);
-      }
-    }
-  };
+    };
 
   /* ============================================================
      TASA DE CAMBIO
@@ -908,23 +1054,36 @@ export default function DashboardPOS() {
 
   const loadExchangeRate = async () => {
     try {
-      const res = await fetch('/api/exchange-rate', {
-        method: 'GET',
-        cache: 'no-store'
-      });
+      const res = await fetch(
+        '/api/exchange-rate',
+        {
+          method: 'GET',
+          cache: 'no-store'
+        }
+      );
 
-      const data = await readJson(res);
-      const parsedRate = Number(data.rate);
+      const data =
+        await readJson(res);
+
+      const parsedRate = Number(
+        data.rate
+      );
 
       if (
         data.success &&
-        Number.isFinite(parsedRate) &&
+        Number.isFinite(
+          parsedRate
+        ) &&
         parsedRate > 0
       ) {
-        setExchangeRate(parsedRate);
+        setExchangeRate(
+          parsedRate
+        );
+
         setExchangeRateSource(
           data.source || null
         );
+
         return;
       }
 
@@ -939,81 +1098,106 @@ export default function DashboardPOS() {
     }
   };
 
-  const handleSaveExchangeRate = async () => {
-    const rate = Number(exchangeRate);
-
-    if (
-      !Number.isFinite(rate) ||
-      rate <= 0
-    ) {
-      alert('Ingresa una tasa de cambio válida.');
-      return;
-    }
-
-    if (!authenticatedUserId) {
-      alert(
-        'No se pudo identificar al usuario autenticado.'
+  const handleSaveExchangeRate =
+    async () => {
+      const rate = Number(
+        exchangeRate
       );
-      return;
-    }
-
-    setIsSavingExchangeRate(true);
-    setExchangeRateMessage('');
-
-    try {
-      const res = await fetch('/api/exchange-rate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          rate,
-          userId: authenticatedUserId
-        })
-      });
-
-      const data = await readJson(res);
-
-      if (!res.ok || !data.success) {
-        throw new Error(
-          data.error ||
-          data.message ||
-          'No se pudo guardar la tasa.'
-        );
-      }
-
-      const savedRate = Number(data.rate);
 
       if (
-        Number.isFinite(savedRate) &&
-        savedRate > 0
+        !Number.isFinite(rate) ||
+        rate <= 0
       ) {
-        setExchangeRate(savedRate);
+        alert(
+          'Ingresa una tasa de cambio válida.'
+        );
+        return;
       }
 
-      setExchangeRateSource(
-        data.source || 'manual'
+      if (!authenticatedUserId) {
+        alert(
+          'No se pudo identificar al usuario autenticado.'
+        );
+        return;
+      }
+
+      setIsSavingExchangeRate(
+        true
       );
 
-      setExchangeRateMessage(
-        'Tasa guardada correctamente en SQLite Cloud.'
-      );
+      setExchangeRateMessage('');
 
-      await loadExchangeRate();
-    } catch (error: any) {
-      console.error(
-        'Error guardando tasa de cambio:',
-        error
-      );
+      try {
+        const res = await fetch(
+          '/api/exchange-rate',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json'
+            },
+            body: JSON.stringify({
+              rate,
+              userId:
+                authenticatedUserId
+            })
+          }
+        );
 
-      setExchangeRateMessage(
-        error?.message ||
-        'No se pudo guardar la tasa.'
-      );
-    } finally {
-      setIsSavingExchangeRate(false);
-    }
-  };
+        const data =
+          await readJson(res);
+
+        if (
+          !res.ok ||
+          !data.success
+        ) {
+          throw new Error(
+            data.error ||
+              data.message ||
+              'No se pudo guardar la tasa.'
+          );
+        }
+
+        const savedRate = Number(
+          data.rate
+        );
+
+        if (
+          Number.isFinite(
+            savedRate
+          ) &&
+          savedRate > 0
+        ) {
+          setExchangeRate(
+            savedRate
+          );
+        }
+
+        setExchangeRateSource(
+          data.source || 'manual'
+        );
+
+        setExchangeRateMessage(
+          'Tasa guardada correctamente en SQLite Cloud.'
+        );
+
+        await loadExchangeRate();
+      } catch (error: any) {
+        console.error(
+          'Error guardando tasa de cambio:',
+          error
+        );
+
+        setExchangeRateMessage(
+          error?.message ||
+            'No se pudo guardar la tasa.'
+        );
+      } finally {
+        setIsSavingExchangeRate(
+          false
+        );
+      }
+    };
 
   /* ============================================================
      CARGA INICIAL
@@ -1024,22 +1208,37 @@ export default function DashboardPOS() {
   }, []);
 
   useEffect(() => {
-    if (!isMounted || typeof window === 'undefined') return;
+    if (
+      !isMounted ||
+      typeof window === 'undefined'
+    )
+      return;
 
     try {
       const savedUser =
-        localStorage.getItem('pos_user');
+        localStorage.getItem(
+          'pos_user'
+        );
 
       if (!savedUser) return;
 
-      const parsedUser = JSON.parse(savedUser);
-      const userId = Number(parsedUser?.id);
+      const parsedUser =
+        JSON.parse(savedUser);
+
+      const userId = Number(
+        parsedUser?.id
+      );
 
       if (
-        !Number.isInteger(userId) ||
+        !Number.isInteger(
+          userId
+        ) ||
         userId <= 0
       ) {
-        console.error('pos_user no contiene un ID válido:', parsedUser);
+        console.error(
+          'pos_user no contiene un ID válido:',
+          parsedUser
+        );
         return;
       }
 
@@ -1050,27 +1249,43 @@ export default function DashboardPOS() {
 
       setCurrentUsername(
         parsedUser?.name ||
-        parsedUser?.email ||
-        ''
+          parsedUser?.email ||
+          ''
       );
     } catch (error) {
-      console.error('Error leyendo pos_user:', error);
+      console.error(
+        'Error leyendo pos_user:',
+        error
+      );
     }
   }, [isMounted]);
 
   useEffect(() => {
-    if (!isMounted || !authenticatedUserId) return;
+    if (
+      !isMounted ||
+      !authenticatedUserId
+    )
+      return;
 
-    checkCashRegisterStatus(false);
+    checkCashRegisterStatus(
+      false
+    );
 
-    if (typeof window !== 'undefined') {
+    if (
+      typeof window !==
+      'undefined'
+    ) {
       const savedCredits =
-        localStorage.getItem('pos_credits');
+        localStorage.getItem(
+          'pos_credits'
+        );
 
       if (savedCredits) {
         try {
           setCredits(
-            JSON.parse(savedCredits)
+            JSON.parse(
+              savedCredits
+            )
           );
         } catch (e) {
           console.error(e);
@@ -1078,12 +1293,16 @@ export default function DashboardPOS() {
       }
 
       const savedPayables =
-        localStorage.getItem('pos_payables');
+        localStorage.getItem(
+          'pos_payables'
+        );
 
       if (savedPayables) {
         try {
           setPayables(
-            JSON.parse(savedPayables)
+            JSON.parse(
+              savedPayables
+            )
           );
         } catch (e) {
           console.error(e);
@@ -1092,7 +1311,10 @@ export default function DashboardPOS() {
 
       loadExchangeRate();
     }
-  }, [isMounted, authenticatedUserId]);
+  }, [
+    isMounted,
+    authenticatedUserId
+  ]);
 
   /* ============================================================
      SINCRONIZAR DATOS CLOUD
@@ -1104,15 +1326,24 @@ export default function DashboardPOS() {
     async function loadCloudData() {
       try {
         const prodRes =
-          await fetch('/api/products', {
-            cache: 'no-store'
-          });
+          await fetch(
+            '/api/products',
+            {
+              cache: 'no-store'
+            }
+          );
 
         const prodData =
           await prodRes.json();
 
-        if (Array.isArray(prodData)) {
-          setProducts(prodData);
+        if (
+          Array.isArray(
+            prodData
+          )
+        ) {
+          setProducts(
+            prodData
+          );
 
           const extractedCats =
             Array.from(
@@ -1127,87 +1358,116 @@ export default function DashboardPOS() {
             );
 
           if (
-            extractedCats.length > 0
+            extractedCats.length >
+            0
           ) {
-            setCategoriesList(prev =>
-              Array.from(
-                new Set([
-                  ...prev,
-                  ...extractedCats
-                ])
-              ) as string[]
+            setCategoriesList(
+              prev =>
+                Array.from(
+                  new Set([
+                    ...prev,
+                    ...extractedCats
+                  ])
+                ) as string[]
             );
           }
         }
 
         const salesRes =
-          await fetch('/api/sales', {
-            cache: 'no-store'
-          });
+          await fetch(
+            '/api/sales',
+            {
+              cache: 'no-store'
+            }
+          );
 
         const salesData =
           await salesRes.json();
 
-        if (Array.isArray(salesData)) {
+        if (
+          Array.isArray(
+            salesData
+          )
+        ) {
           const formattedSales =
             salesData.map(
               (sale: any) => ({
-                id: Number(sale.id),
-                items: sale.items || [],
-                subtotalUSD: Number(
-                  sale.subtotal_usd ||
-                  sale.subtotalUSD ||
-                  0
+                id: Number(
+                  sale.id
                 ),
-                ivaUSD: Number(
-                  sale.iva_usd ||
-                  sale.ivaUSD ||
-                  0
-                ),
-                totalUSD: Number(
-                  sale.total_usd ||
-                  sale.totalUSD ||
-                  0
-                ),
-                totalBs: Number(
-                  sale.total_bs ||
-                  sale.totalBs ||
-                  (
-                    Number(
-                      sale.total_usd ||
+
+                items:
+                  sale.items ||
+                  [],
+
+                subtotalUSD:
+                  Number(
+                    sale.subtotal_usd ||
+                      sale.subtotalUSD ||
+                      0
+                  ),
+
+                ivaUSD:
+                  Number(
+                    sale.iva_usd ||
+                      sale.ivaUSD ||
+                      0
+                  ),
+
+                totalUSD:
+                  Number(
+                    sale.total_usd ||
                       sale.totalUSD ||
                       0
-                    ) *
-                    exchangeRate
-                  )
-                ),
-                exchangeRate: Number(
-                  sale.exchange_rate ||
-                  sale.exchangeRate ||
-                  exchangeRate
-                ),
+                  ),
+
+                totalBs:
+                  Number(
+                    sale.total_bs ||
+                      sale.totalBs ||
+                      Number(
+                        sale.total_usd ||
+                          sale.totalUSD ||
+                          0
+                      ) *
+                        exchangeRate
+                  ),
+
+                exchangeRate:
+                  Number(
+                    sale.exchange_rate ||
+                      sale.exchangeRate ||
+                      exchangeRate
+                  ),
+
                 paymentMethod:
                   sale.payment_method ||
-                  sale.paymentMethod ||
-                  'Efectivo USD',
-                changeUSD: Number(
-                  sale.change_usd ||
-                  sale.changeUSD ||
-                  0
-                ),
+                    sale.paymentMethod ||
+                    'Efectivo USD',
+
+                changeUSD:
+                  Number(
+                    sale.change_usd ||
+                      sale.changeUSD ||
+                      0
+                  ),
+
                 clientName:
                   sale.client_name ||
-                  sale.clientName ||
-                  'Cliente Genérico',
-                cashRegisterId: Number(
-                  sale.cash_register_id ||
-                  sale.cashRegisterId ||
-                  0
-                ),
+                    sale.clientName ||
+                    'Cliente Genérico',
+
+                cashRegisterId:
+                  Number(
+                    sale.cash_register_id ||
+                      sale.cashRegisterId ||
+                      0
+                  ),
+
                 date:
                   sale.created_at ||
-                  sale.date ||
-                  new Date().toLocaleString()
+                    sale.date ||
+                    new Date().toLocaleString()
               })
             );
 
@@ -1224,7 +1484,10 @@ export default function DashboardPOS() {
     }
 
     loadCloudData();
-  }, [exchangeRate, isMounted]);
+  }, [
+    exchangeRate,
+    isMounted
+  ]);
 
   /* ============================================================
      ACTUALIZAR ROLES
@@ -1233,8 +1496,13 @@ export default function DashboardPOS() {
   useEffect(() => {
     const interval =
       setInterval(() => {
-        setRolesList(getRoles());
-        setUsersList(getUsers());
+        setRolesList(
+          getRoles()
+        );
+
+        setUsersList(
+          getUsers()
+        );
       }, 1000);
 
     return () =>
@@ -1257,10 +1525,13 @@ export default function DashboardPOS() {
   ) => {
     if (tab === 'pos') {
       try {
-        const userId = authenticatedUserId;
+        const userId =
+          authenticatedUserId;
 
         if (
-          !Number.isInteger(userId) ||
+          !Number.isInteger(
+            userId
+          ) ||
           userId <= 0
         ) {
           alert(
@@ -1288,14 +1559,20 @@ export default function DashboardPOS() {
           setIsCashOpen(true);
 
           setActiveRegisterId(
-            Number(data.register.id)
+            Number(
+              data.register.id
+            )
           );
 
           setActiveTab('pos');
         } else {
           setIsCashOpen(false);
-          setActiveRegisterId(null);
-          setShowOpenCashModal(true);
+          setActiveRegisterId(
+            null
+          );
+          setShowOpenCashModal(
+            true
+          );
         }
       } catch (err) {
         console.error(
@@ -1303,7 +1580,9 @@ export default function DashboardPOS() {
           err
         );
 
-        setShowOpenCashModal(true);
+        setShowOpenCashModal(
+          true
+        );
       }
     } else {
       setActiveTab(tab);
@@ -1314,85 +1593,95 @@ export default function DashboardPOS() {
      ABRIR CAJA
   ============================================================ */
 
-  const handleOpenCashSubmit = async (
-    e: React.FormEvent
-  ) => {
-    e.preventDefault();
+  const handleOpenCashSubmit =
+    async (
+      e: React.FormEvent
+    ) => {
+      e.preventDefault();
 
-    const usd =
-      Number(openingUSD || 0);
-
-    const bs =
-      Number(openingBs || 0);
-
-    const userId = authenticatedUserId;
-
-    if (
-      !Number.isInteger(userId) ||
-      userId <= 0
-    ) {
-      alert(
-        'No se pudo identificar correctamente al usuario.'
-      );
-      return;
-    }
-
-    try {
-      const res = await fetch(
-        '/api/cash',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type':
-              'application/json'
-          },
-          body: JSON.stringify({
-            action: 'open',
-            openingUSD: usd,
-            openingBs: bs,
-            userId
-          })
-        }
+      const usd = Number(
+        openingUSD || 0
       );
 
-      const data =
-        await res.json();
+      const bs = Number(
+        openingBs || 0
+      );
 
-      if (data.success) {
+      const userId =
+        authenticatedUserId;
+
+      if (
+        !Number.isInteger(
+          userId
+        ) ||
+        userId <= 0
+      ) {
         alert(
-          '¡Caja abierta exitosamente!'
+          'No se pudo identificar correctamente al usuario.'
         );
+        return;
+      }
 
-        setShowOpenCashModal(false);
-        setOpeningUSD('');
-        setOpeningBs('');
+      try {
+        const res =
+          await fetch(
+            '/api/cash',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type':
+                  'application/json'
+              },
+              body: JSON.stringify({
+                action: 'open',
+                openingUSD: usd,
+                openingBs: bs,
+                userId
+              })
+            }
+          );
 
-        setIsCashOpen(true);
+        const data =
+          await res.json();
 
-        if (data.register) {
-          setActiveRegisterId(
-            Number(data.register.id)
+        if (data.success) {
+          alert(
+            '¡Caja abierta exitosamente!'
+          );
+
+          setShowOpenCashModal(
+            false
+          );
+
+          setOpeningUSD('');
+          setOpeningBs('');
+
+          setIsCashOpen(true);
+
+          if (data.register) {
+            setActiveRegisterId(
+              Number(
+                data.register.id
+              )
+            );
+          }
+
+          setActiveTab('pos');
+        } else {
+          alert(
+            'Error: ' +
+              (data.error ||
+                'No se pudo abrir la caja.')
           );
         }
+      } catch (err) {
+        console.error(err);
 
-        setActiveTab('pos');
-      } else {
         alert(
-          'Error: ' +
-          (
-            data.error ||
-            'No se pudo abrir la caja.'
-          )
+          'Error abriendo la caja.'
         );
       }
-    } catch (err) {
-      console.error(err);
-
-      alert(
-        'Error abriendo la caja.'
-      );
-    }
-  };
+    };
 
   /* ============================================================
      CERRAR CAJA
@@ -1407,10 +1696,13 @@ export default function DashboardPOS() {
         return;
       }
 
-      const userId = authenticatedUserId;
+      const userId =
+        authenticatedUserId;
 
       if (
-        !Number.isInteger(userId) ||
+        !Number.isInteger(
+          userId
+        ) ||
         userId <= 0
       ) {
         alert(
@@ -1421,27 +1713,28 @@ export default function DashboardPOS() {
 
       try {
         const res =
-          await fetch('/api/cash', {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json'
-            },
-            body: JSON.stringify({
-              action: 'close',
-              registerId:
-                activeRegisterId,
-              countedUSD:
-                Number(
+          await fetch(
+            '/api/cash',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type':
+                  'application/json'
+              },
+              body: JSON.stringify({
+                action: 'close',
+                registerId:
+                  activeRegisterId,
+                countedUSD: Number(
                   countedUSD || 0
                 ),
-              countedBs:
-                Number(
+                countedBs: Number(
                   countedBs || 0
                 ),
-              userId
-            })
-          });
+                userId
+              })
+            }
+          );
 
         const data =
           await res.json();
@@ -1451,21 +1744,26 @@ export default function DashboardPOS() {
             '¡Caja cerrada y arqueada exitosamente!'
           );
 
-          setShowCloseCashModal(false);
+          setShowCloseCashModal(
+            false
+          );
+
           setCountedUSD('');
           setCountedBs('');
 
           setIsCashOpen(false);
-          setActiveRegisterId(null);
+          setActiveRegisterId(
+            null
+          );
 
-          setActiveTab('welcome');
+          setActiveTab(
+            'welcome'
+          );
         } else {
           alert(
             'Error: ' +
-            (
-              data.error ||
-              'No se pudo cerrar la caja.'
-            )
+              (data.error ||
+                'No se pudo cerrar la caja.')
           );
         }
       } catch (err) {
@@ -1478,12 +1776,266 @@ export default function DashboardPOS() {
     };
 
   /* ============================================================
+     CARGAR PEDIDO WEB EN POS
+  ============================================================ */
+
+  const handleLoadWebOrder = (
+    order: any
+  ) => {
+    if (
+      !isCashOpen ||
+      !activeRegisterId
+    ) {
+      alert(
+        'Abra una caja antes de cargar y facturar un pedido web.'
+      );
+      return;
+    }
+
+    const mappedItems: CartItem[] = (
+      order.items || []
+    )
+      .map((item: any) => {
+        const product =
+          products.find(
+            p =>
+              p.id ===
+              Number(
+                item.product_id
+              )
+          );
+
+        if (product) {
+          return {
+            ...product,
+            id: Number(
+              item.product_id
+            ),
+            name:
+              item.name ||
+              product.name,
+            price: Number(
+              item.price_at_sale
+            ),
+            taxable: Boolean(
+              item.taxable
+            ),
+            quantity: Number(
+              item.quantity
+            )
+          };
+        }
+
+        return {
+          id: Number(
+            item.product_id
+          ),
+          name:
+            item.name ||
+            'Producto',
+          costPrice: 0,
+          price: Number(
+            item.price_at_sale
+          ),
+          category: 'Pedido Web',
+          description:
+            'Producto cargado desde pedido web.',
+          taxable: Boolean(
+            item.taxable
+          ),
+          stock:
+            Number(
+              item.current_stock
+            ) || 0,
+          quantity: Number(
+            item.quantity
+          )
+        };
+      })
+      .filter(
+        (
+          item: CartItem
+        ) =>
+          Number.isInteger(
+            item.id
+          ) &&
+          item.id > 0 &&
+          item.quantity > 0
+      );
+
+    if (
+      mappedItems.length === 0
+    ) {
+      alert(
+        'No se pudieron cargar los productos de este pedido web.'
+      );
+      return;
+    }
+
+    const totalOrderUSD =
+      Number(
+        order.total_usd
+      ) || 0;
+
+    const webDeliveryCost =
+      order.order_type ===
+      'Delivery'
+        ? order.delivery_zone ===
+          'Guarenas'
+          ? 2
+          : 3
+        : 0;
+
+    const webSubtotal =
+      Math.max(
+        0,
+        totalOrderUSD -
+          webDeliveryCost
+      );
+
+    const webExchangeRate =
+      Number(
+        order.exchange_rate
+      ) ||
+      exchangeRate;
+
+    const webTotalBs =
+      Number(order.total_ves) ||
+      totalOrderUSD *
+        webExchangeRate;
+
+    let preferredPayment:
+      PaymentMethodType =
+      'Efectivo USD';
+
+    const webPayment =
+      String(
+        order.payment_method ||
+          ''
+      );
+
+    if (
+      webPayment ===
+      'Pago Móvil (Bs)'
+    ) {
+      preferredPayment =
+        'Pago Móvil';
+    } else if (
+      webPayment ===
+      'Zelle / Binance'
+    ) {
+      preferredPayment =
+        'Zelle';
+    } else if (
+      webPayment ===
+      'Efectivo / Divisas'
+    ) {
+      preferredPayment =
+        'Efectivo USD';
+    } else if (
+      [
+        'Efectivo USD',
+        'Efectivo Bs',
+        'Pago Móvil',
+        'Zelle',
+        'Binance Pay',
+        'Crédito / Fiado'
+      ].includes(
+        webPayment
+      )
+    ) {
+      preferredPayment =
+        webPayment as PaymentMethodType;
+    }
+
+    setCart(
+      mappedItems
+    );
+
+    setLoadedWebOrder({
+      id: Number(order.id),
+
+      customer_name:
+        order.customer_name ||
+        '',
+
+      customer_phone:
+        order.customer_phone ||
+        '',
+
+      customer_document:
+        order.customer_document ||
+        '',
+
+      subtotalUSD:
+        webSubtotal,
+
+      totalUSD:
+        totalOrderUSD,
+
+      totalBs:
+        webTotalBs,
+
+      exchangeRate:
+        webExchangeRate,
+
+      order_type:
+        order.order_type ||
+        '',
+
+      delivery_zone:
+        order.delivery_zone ||
+        '',
+
+      delivery_address:
+        order.delivery_address ||
+        ''
+    });
+
+    setClientName(
+      order.customer_name ||
+        ''
+    );
+
+    setClientPhone(
+      order.customer_phone ||
+        ''
+    );
+
+    setClientDocument(
+      order.customer_document ||
+        ''
+    );
+
+    setPaymentMethod(
+      preferredPayment
+    );
+
+    setCashGivenUSD('');
+
+    setIsCheckoutModalOpen(
+      false
+    );
+
+    alert(
+      `Pedido web #${order.id} cargado al POS. Ahora puede procesar el pago.`
+    );
+  };
+
+  /* ============================================================
      CARRITO
   ============================================================ */
 
   const addToCart = (
     product: Product
   ) => {
+    if (loadedWebOrder) {
+      alert(
+        'Este pedido web está bloqueado para evitar modificar sus productos.'
+      );
+      return;
+    }
+
     if (product.stock <= 0) {
       alert(
         'Producto sin stock disponible.'
@@ -1495,7 +2047,8 @@ export default function DashboardPOS() {
       const existing =
         prev.find(
           item =>
-            item.id === product.id
+            item.id ===
+            product.id
         );
 
       if (existing) {
@@ -1512,11 +2065,13 @@ export default function DashboardPOS() {
 
         return prev.map(
           item =>
-            item.id === product.id
+            item.id ===
+            product.id
               ? {
                   ...item,
                   quantity:
-                    item.quantity + 1
+                    item.quantity +
+                    1
                 }
               : item
         );
@@ -1536,12 +2091,20 @@ export default function DashboardPOS() {
     id: number,
     delta: number
   ) => {
+    if (loadedWebOrder) {
+      alert(
+        'Este pedido web está bloqueado para evitar modificar sus productos.'
+      );
+      return;
+    }
+
     setCart(prev =>
       prev
         .map(item => {
           if (item.id === id) {
             const newQty =
-              item.quantity + delta;
+              item.quantity +
+              delta;
 
             if (newQty <= 0) {
               return null;
@@ -1549,12 +2112,14 @@ export default function DashboardPOS() {
 
             const prod =
               products.find(
-                p => p.id === id
+                p =>
+                  p.id === id
               );
 
             if (
               prod &&
-              newQty > prod.stock
+              newQty >
+                prod.stock
             ) {
               alert(
                 'Stock insuficiente.'
@@ -1571,16 +2136,26 @@ export default function DashboardPOS() {
 
           return item;
         })
-        .filter(Boolean) as CartItem[]
+        .filter(
+          Boolean
+        ) as CartItem[]
     );
   };
 
   const removeFromCart = (
     id: number
   ) => {
+    if (loadedWebOrder) {
+      alert(
+        'Este pedido web está bloqueado para evitar modificar sus productos.'
+      );
+      return;
+    }
+
     setCart(prev =>
       prev.filter(
-        item => item.id !== id
+        item =>
+          item.id !== id
       )
     );
   };
@@ -1589,7 +2164,7 @@ export default function DashboardPOS() {
      TOTALES
   ============================================================ */
 
-  const subtotalUSD =
+  const calculatedSubtotalUSD =
     cart.reduce(
       (acc, item) =>
         acc +
@@ -1598,25 +2173,51 @@ export default function DashboardPOS() {
       0
     );
 
-  const ivaUSD =
+  const calculatedIvaUSD =
     cart.reduce(
       (acc, item) =>
         acc +
-        (
-          item.taxable
-            ? item.price *
-              item.quantity *
-              IVA_RATE
-            : 0
-        ),
+        (item.taxable
+          ? item.price *
+            item.quantity *
+            IVA_RATE
+          : 0),
       0
     );
 
+  const subtotalUSD =
+    loadedWebOrder
+      ? Number(
+          loadedWebOrder.subtotalUSD
+        ) || 0
+      : calculatedSubtotalUSD;
+
+  const ivaUSD =
+    loadedWebOrder
+      ? 0
+      : calculatedIvaUSD;
+
   const totalUSD =
-    subtotalUSD + ivaUSD;
+    loadedWebOrder
+      ? Number(
+          loadedWebOrder.totalUSD
+        ) || 0
+      : subtotalUSD + ivaUSD;
 
   const totalBs =
-    totalUSD * exchangeRate;
+    loadedWebOrder
+      ? Number(
+          loadedWebOrder.totalBs
+        ) || 0
+      : totalUSD * exchangeRate;
+
+  const effectiveExchangeRate =
+    loadedWebOrder
+      ? Number(
+          loadedWebOrder.exchangeRate
+        ) ||
+        exchangeRate
+      : exchangeRate;
 
   const totalSalesTodayUSD =
     salesHistory.reduce(
@@ -1637,239 +2238,173 @@ export default function DashboardPOS() {
      CHECKOUT
   ============================================================ */
 
-  const handleCheckout = async (
-    e: React.FormEvent
-  ) => {
-    e.preventDefault();
+  const handleCheckout =
+    async (
+      e: React.FormEvent
+    ) => {
+      e.preventDefault();
 
-    if (cart.length === 0) {
-      return;
-    }
-
-    /* ========================================================
-       VALIDAR USUARIO
-    ======================================================== */
-
-    const userId = authenticatedUserId;
-
-    if (
-      !Number.isInteger(userId) ||
-      userId <= 0
-    ) {
-      alert(
-        'No se pudo identificar correctamente al usuario actual.'
-      );
-      return;
-    }
-
-    /* ========================================================
-       VALIDAR CAJA LOCAL
-    ======================================================== */
-
-    if (!activeRegisterId) {
-      alert(
-        'No hay una caja abierta. Abra una caja antes de registrar la venta.'
-      );
-
-      setIsCashOpen(false);
-      setShowOpenCashModal(true);
-      setIsCheckoutModalOpen(false);
-
-      return;
-    }
-
-    try {
-      /* ======================================================
-         REVALIDAR CAJA EN BASE DE DATOS
-      ====================================================== */
-
-      const cashRes =
-        await fetch(
-          `/api/cash?userId=${userId}`,
-          {
-            method: 'GET',
-            cache: 'no-store'
-          }
-        );
-
-      const cashData =
-        await readJson(cashRes);
-
-      if (
-        !cashRes.ok ||
-        !cashData.success ||
-        !cashData.isOpen ||
-        !cashData.register
-      ) {
-        setIsCashOpen(false);
-        setActiveRegisterId(null);
-        setIsCheckoutModalOpen(false);
-        setShowOpenCashModal(true);
-
-        alert(
-          'La caja ya no se encuentra abierta. Abra nuevamente una caja para continuar.'
-        );
-
+      if (cart.length === 0) {
         return;
       }
 
-      const databaseRegisterId =
-        Number(
-          cashData.register.id
-        );
+      const userId =
+        authenticatedUserId;
 
       if (
         !Number.isInteger(
-          databaseRegisterId
+          userId
         ) ||
-        databaseRegisterId <= 0
+        userId <= 0
       ) {
         alert(
-          'La caja abierta no tiene un ID válido.'
+          'No se pudo identificar correctamente al usuario actual.'
+        );
+        return;
+      }
+
+      if (!activeRegisterId) {
+        alert(
+          'No hay una caja abierta. Abra una caja antes de registrar la venta.'
+        );
+
+        setIsCashOpen(false);
+        setShowOpenCashModal(
+          true
+        );
+        setIsCheckoutModalOpen(
+          false
         );
 
         return;
       }
 
-      setActiveRegisterId(
-        databaseRegisterId
-      );
+      try {
+        const cashRes =
+          await fetch(
+            `/api/cash?userId=${userId}`,
+            {
+              method: 'GET',
+              cache: 'no-store'
+            }
+          );
 
-      /* ======================================================
-         VALIDAR PAGO
-      ====================================================== */
+        const cashData =
+          await readJson(
+            cashRes
+          );
 
-      const givenUSD =
-        parseFloat(
-          cashGivenUSD || '0'
-        );
-
-      let changeUSD = 0;
-      let changeBs = 0;
-
-      if (
-        paymentMethod ===
-        'Efectivo USD'
-      ) {
         if (
-          givenUSD < totalUSD
+          !cashRes.ok ||
+          !cashData.success ||
+          !cashData.isOpen ||
+          !cashData.register
         ) {
+          setIsCashOpen(false);
+          setActiveRegisterId(
+            null
+          );
+
+          setIsCheckoutModalOpen(
+            false
+          );
+
+          setShowOpenCashModal(
+            true
+          );
+
           alert(
-            'El monto entregado es menor al total.'
+            'La caja ya no se encuentra abierta. Abra nuevamente una caja para continuar.'
           );
 
           return;
         }
 
-        changeUSD =
-          givenUSD - totalUSD;
+        const databaseRegisterId =
+          Number(
+            cashData.register.id
+          );
 
-        changeBs =
-          changeUSD *
-          exchangeRate;
-      }
+        if (
+          !Number.isInteger(
+            databaseRegisterId
+          ) ||
+          databaseRegisterId <= 0
+        ) {
+          alert(
+            'La caja abierta no tiene un ID válido.'
+          );
 
-      if (
-        paymentMethod ===
-          'Crédito / Fiado' &&
-        !clientName.trim()
-      ) {
-        alert(
-          'Especifique el nombre del cliente para ventas a crédito.'
+          return;
+        }
+
+        setActiveRegisterId(
+          databaseRegisterId
         );
 
-        return;
-      }
+        /* ======================================================
+           VALIDAR PAGO
+        ====================================================== */
 
-      /* ======================================================
-         PREPARAR VENTA
-      ====================================================== */
+        const givenUSD =
+          parseFloat(
+            cashGivenUSD ||
+              '0'
+          );
 
-      const salePayload = {
-        items: cart,
+        let changeUSD = 0;
+        let changeBs = 0;
 
-        subtotalUSD,
-        ivaUSD,
-        totalUSD,
-        totalBs,
-        exchangeRate,
+        if (
+          paymentMethod ===
+          'Efectivo USD'
+        ) {
+          if (
+            givenUSD < totalUSD
+          ) {
+            alert(
+              'El monto entregado es menor al total.'
+            );
 
-        paymentMethod,
-        changeUSD,
+            return;
+          }
 
-        clientName:
-          clientName ||
-          'Cliente Genérico',
+          changeUSD =
+            givenUSD -
+            totalUSD;
 
-        created_at:
-          new Date().toISOString(),
+          changeBs =
+            changeUSD *
+            effectiveExchangeRate;
+        }
 
-        /* IMPORTANTE */
-        cashRegisterId:
-          databaseRegisterId,
+        if (
+          paymentMethod ===
+            'Crédito / Fiado' &&
+          !clientName.trim()
+        ) {
+          alert(
+            'Especifique el nombre del cliente para ventas a crédito.'
+          );
 
-        // /api/sales usa este nombre como campo principal.
-        cash_register_id:
-          databaseRegisterId,
+          return;
+        }
 
-        userId
-      };
+        /* ======================================================
+           PREPARAR VENTA
+        ====================================================== */
 
-      /* ======================================================
-         REGISTRAR VENTA
-      ====================================================== */
-
-      const res =
-        await fetch('/api/sales', {
-          method: 'POST',
-          headers: {
-            'Content-Type':
-              'application/json'
-          },
-          body:
-            JSON.stringify(
-              salePayload
-            )
-        });
-
-      const data =
-        await res.json();
-
-      if (
-        !res.ok ||
-        !data.success
-      ) {
-        alert(
-          'Error: ' +
-          (
-            data.error ||
-            'No se pudo registrar la venta.'
-          )
-        );
-
-        return;
-      }
-
-      /* ======================================================
-         REGISTRO LOCAL
-      ====================================================== */
-
-      const newSaleRecord: SaleRecord =
-        {
-          id: Number(
-            data.saleId
-          ),
-
-          date:
-            new Date().toLocaleString(),
-
-          items: [...cart],
+        const salePayload = {
+          items: cart,
 
           subtotalUSD,
           ivaUSD,
           totalUSD,
           totalBs,
-          exchangeRate,
+
+          exchangeRate:
+            effectiveExchangeRate,
+
           paymentMethod,
           changeUSD,
 
@@ -1877,134 +2412,227 @@ export default function DashboardPOS() {
             clientName ||
             'Cliente Genérico',
 
+          clientPhone:
+            clientPhone || '',
+
+          clientDocument:
+            clientDocument || '',
+
           created_at:
             new Date().toISOString(),
 
           cashRegisterId:
-            databaseRegisterId
+            databaseRegisterId,
+
+          cash_register_id:
+            databaseRegisterId,
+
+          userId,
+
+          webOrderId:
+            loadedWebOrder?.id ||
+            null
         };
 
-      setSalesHistory(prev => [
-        newSaleRecord,
-        ...prev
-      ]);
+        /* ======================================================
+           REGISTRAR VENTA
+        ====================================================== */
 
-      setLastPrintedSale(
-        newSaleRecord
-      );
+        const res =
+          await fetch(
+            '/api/sales',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type':
+                  'application/json'
+              },
+              body: JSON.stringify(
+                salePayload
+              )
+            }
+          );
 
-      /* ======================================================
-         CRÉDITO
-      ====================================================== */
+        const data =
+          await readJson(res);
 
-      if (
-        paymentMethod ===
-        'Crédito / Fiado'
-      ) {
-        const newCredit:
-          CreditAccount = {
-            id: Date.now(),
+        if (
+          !res.ok ||
+          !data.success
+        ) {
+          alert(
+            'Error: ' +
+              (data.error ||
+                data.message ||
+                'No se pudo registrar la venta.')
+          );
+
+          return;
+        }
+
+        /* ======================================================
+           REGISTRO LOCAL
+        ====================================================== */
+
+        const newSaleRecord: SaleRecord =
+          {
+            id: Number(
+              data.saleId
+            ),
+
+            date:
+              new Date().toLocaleString(),
+
+            items: [...cart],
+
+            subtotalUSD,
+            ivaUSD,
+            totalUSD,
+            totalBs,
+
+            exchangeRate:
+              effectiveExchangeRate,
+
+            paymentMethod,
+            changeUSD,
 
             clientName:
               clientName ||
               'Cliente Genérico',
 
-            clientPhone:
-              clientPhone ||
-              'N/A',
+            created_at:
+              new Date().toISOString(),
 
-            clientDocument:
-              clientDocument ||
-              'N/A',
-
-            totalDebtUSD:
-              totalUSD,
-
-            totalDebtBs:
-              totalBs,
-
-            date:
-              new Date()
-                .toLocaleDateString(),
-
-            status: 'Pendiente',
-
-            saleId:
-              newSaleRecord.id
+            cashRegisterId:
+              databaseRegisterId
           };
 
-        setCredits(prev => [
-          newCredit,
+        setSalesHistory(prev => [
+          newSaleRecord,
           ...prev
         ]);
-      }
 
-      /* ======================================================
-         IMPORTANTE:
-         NO DESCONTAMOS STOCK AQUÍ.
-         
-         /api/sales YA DESCUENTA EL STOCK.
-      ====================================================== */
-
-      const prodRes =
-        await fetch(
-          '/api/products',
-          {
-            cache: 'no-store'
-          }
+        setLastPrintedSale(
+          newSaleRecord
         );
 
-      const prodData =
-        await prodRes.json();
+        /* ======================================================
+           CRÉDITO
+        ====================================================== */
 
-if (
-        Array.isArray(
-          prodData
-        )
-      ) {
-        setProducts(
-          prodData
-        );
-      }
-
-      /* ======================================================
-         ÉXITO
-      ====================================================== */
-
-      setSuccessModalData({
-        isOpen: true,
-        changeUSD,
-        changeBs,
-        isCredit:
+        if (
           paymentMethod ===
-          'Crédito / Fiado',
-        clientName:
-          clientName ||
-          undefined
-      });
+          'Crédito / Fiado'
+        ) {
+          const newCredit:
+            CreditAccount = {
+              id: Date.now(),
 
-      setCart([]);
+              clientName:
+                clientName ||
+                'Cliente Genérico',
 
-      setIsCheckoutModalOpen(
-        false
-      );
+              clientPhone:
+                clientPhone ||
+                'N/A',
 
-      setCashGivenUSD('');
-      setClientName('');
-      setClientPhone('');
-      setClientDocument('');
+              clientDocument:
+                clientDocument ||
+                'N/A',
 
-    } catch (err) {
-      console.error(
-        'Error procesando venta:',
-        err
-      );
+              totalDebtUSD:
+                totalUSD,
 
-      alert(
-        'Error procesando la venta. Verifique que la caja siga abierta.'
-      );
-    }
-  };
+              totalDebtBs:
+                totalBs,
+
+              date: new Date()
+                .toLocaleDateString(),
+
+              status:
+                'Pendiente',
+
+              saleId:
+                newSaleRecord.id
+            };
+
+          setCredits(prev => [
+            newCredit,
+            ...prev
+          ]);
+        }
+
+        /* ======================================================
+           IMPORTANTE:
+           /api/sales YA DESCUENTA EL STOCK.
+        ====================================================== */
+
+        const prodRes =
+          await fetch(
+            '/api/products',
+            {
+              cache: 'no-store'
+            }
+          );
+
+        const prodData =
+          await prodRes.json();
+
+        if (
+          Array.isArray(
+            prodData
+          )
+        ) {
+          setProducts(
+            prodData
+          );
+        }
+
+        /* ======================================================
+           ÉXITO
+        ====================================================== */
+
+        setSuccessModalData({
+          isOpen: true,
+
+          changeUSD,
+
+          changeBs,
+
+          isCredit:
+            paymentMethod ===
+            'Crédito / Fiado',
+
+          clientName:
+            clientName ||
+            undefined
+        });
+
+        setCart([]);
+
+        setLoadedWebOrder(
+          null
+        );
+
+        setIsCheckoutModalOpen(
+          false
+        );
+
+        setCashGivenUSD('');
+        setClientName('');
+        setClientPhone('');
+        setClientDocument('');
+      } catch (err) {
+        console.error(
+          'Error procesando venta:',
+          err
+        );
+
+        alert(
+          'Error procesando la venta. Verifique que la caja siga abierta.'
+        );
+      }
+    };
 
   /* ============================================================
      PRODUCTOS
@@ -2109,14 +2737,13 @@ if (
       } else {
         alert(
           'Error: ' +
-          (
-            data.error ||
-            'No se pudo crear el producto.'
-          )
+            (data.error ||
+              'No se pudo crear el producto.')
         );
       }
     } catch (err) {
       console.error(err);
+
       alert(
         'Error de red al crear el producto.'
       );
@@ -2159,6 +2786,7 @@ if (
             },
             body: JSON.stringify({
               ...selectedProductForRestock,
+
               stock:
                 selectedProductForRestock.stock +
                 qty
@@ -2203,15 +2831,16 @@ if (
         }
       } else {
         const data =
-          await res.json()
-            .catch(() => ({}));
+          await res
+            .json()
+            .catch(
+              () => ({})
+            );
 
         alert(
           'Error: ' +
-          (
-            data.error ||
-            'No se pudo actualizar el inventario.'
-          )
+            (data.error ||
+              'No se pudo actualizar el inventario.')
         );
       }
     } catch (err) {
@@ -2358,15 +2987,16 @@ if (
           }
         } else {
           const data =
-            await res.json()
-              .catch(() => ({}));
+            await res
+              .json()
+              .catch(
+                () => ({})
+              );
 
           alert(
             'Error: ' +
-            (
-              data.error ||
-              'No se pudo actualizar el producto.'
-            )
+              (data.error ||
+                'No se pudo actualizar el producto.')
           );
         }
       } catch (err) {
@@ -2427,12 +3057,15 @@ if (
           }
         } else {
           const data =
-            await res.json()
-              .catch(() => ({}));
+            await res
+              .json()
+              .catch(
+                () => ({})
+              );
 
           alert(
             data.error ||
-            'No se pudo eliminar el producto.'
+              'No se pudo eliminar el producto.'
           );
         }
       } catch (err) {
@@ -2575,9 +3208,7 @@ if (
       ====================================================== */}
 
       <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 px-6 py-3 flex flex-wrap justify-between items-center gap-4 shadow-xs">
-
         <div className="flex items-center gap-4">
-
           <div
             className="bg-blue-600 text-white p-2 rounded-2xl font-black text-sm shadow-sm cursor-pointer"
             onClick={() =>
@@ -2601,15 +3232,16 @@ if (
 
           <div className="hidden sm:flex items-center bg-blue-50/70 border border-blue-100 rounded-xl px-3 py-1 text-xs font-bold text-blue-700">
             BCV: Bs.{' '}
-            {exchangeRate.toFixed(2)} / $1
+            {exchangeRate.toFixed(
+              2
+            )}{' '}
+            / $1
           </div>
-
         </div>
 
         {/* NAVEGACIÓN */}
 
         <nav className="flex items-center gap-1 bg-slate-100/80 p-1.5 rounded-2xl text-xs font-bold border border-slate-200/50">
-
           <button
             onClick={() =>
               handleTabChange(
@@ -2617,7 +3249,8 @@ if (
               )
             }
             className={`px-3.5 py-1.5 rounded-xl transition ${
-              activeTab === 'welcome'
+              activeTab ===
+              'welcome'
                 ? 'bg-white text-blue-600 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
@@ -2654,7 +3287,8 @@ if (
                 )
               }
               className={`px-3.5 py-1.5 rounded-xl transition ${
-                activeTab === 'inventory'
+                activeTab ===
+                'inventory'
                   ? 'bg-white text-blue-600 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
@@ -2673,7 +3307,8 @@ if (
                 )
               }
               className={`px-3.5 py-1.5 rounded-xl transition ${
-                activeTab === 'reports'
+                activeTab ===
+                'reports'
                   ? 'bg-white text-blue-600 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
@@ -2700,7 +3335,8 @@ if (
                 )
               }
               className={`px-3.5 py-1.5 rounded-xl transition ${
-                activeTab === 'accounts'
+                activeTab ===
+                'accounts'
                   ? 'bg-white text-blue-600 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
@@ -2719,7 +3355,8 @@ if (
                 )
               }
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
-                activeTab === 'customers'
+                activeTab ===
+                'customers'
                   ? 'bg-white text-blue-600 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
@@ -2738,7 +3375,8 @@ if (
                 )
               }
               className={`px-3.5 py-1.5 rounded-xl transition ${
-                activeTab === 'roles'
+                activeTab ===
+                'roles'
                   ? 'bg-white text-blue-600 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
@@ -2746,13 +3384,11 @@ if (
               🔐 Roles
             </button>
           )}
-
         </nav>
 
         {/* CAJA / USUARIO */}
 
         <div className="flex items-center gap-3">
-
           {isCashOpen && (
             <button
               onClick={() =>
@@ -2767,7 +3403,6 @@ if (
           )}
 
           <div className="flex items-center gap-3 bg-slate-50 border border-slate-200/70 px-3 py-1.5 rounded-2xl">
-
             <div className="text-right">
               <div className="text-xs font-bold text-slate-800">
                 {currentUserObj?.name ||
@@ -2809,9 +3444,7 @@ if (
                 )
               )}
             </select>
-
           </div>
-
         </div>
       </header>
 
@@ -2828,9 +3461,7 @@ if (
         {activeTab ===
           'welcome' && (
           <div className="space-y-6 py-6 animate-fadeIn">
-
             <div className="bg-white border border-slate-200/80 rounded-3xl p-8 shadow-sm text-center space-y-4 max-w-2xl mx-auto">
-
               <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center text-2xl mx-auto font-bold shadow-xs">
                 ⚡
               </div>
@@ -2846,7 +3477,6 @@ if (
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4">
-
                 {userPermissions.includes(
                   'view_pos'
                 ) && (
@@ -2909,12 +3539,10 @@ if (
                     </span>
                   </button>
                 )}
-
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
-
               <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase">
@@ -2968,7 +3596,6 @@ if (
                   🧾
                 </div>
               </div>
-
             </div>
 
             <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm max-w-3xl mx-auto">
@@ -2985,11 +3612,12 @@ if (
                   </div>
 
                   <p className="text-[10px] font-bold text-blue-600 uppercase">
-                    {exchangeRateSource === 'manual'
+                    {exchangeRateSource ===
+                    'manual'
                       ? 'Manual'
                       : exchangeRateSource
-                        ? exchangeRateSource
-                        : 'Sin registrar'}
+                      ? exchangeRateSource
+                      : 'Sin registrar'}
                   </p>
 
                   <p className="text-xs text-slate-500">
@@ -3007,10 +3635,15 @@ if (
                       type="number"
                       min="0"
                       step="0.01"
-                      value={exchangeRate}
+                      value={
+                        exchangeRate
+                      }
                       onChange={e =>
                         setExchangeRate(
-                          Number(e.target.value)
+                          Number(
+                            e.target
+                              .value
+                          )
                         )
                       }
                       className="w-full sm:w-36 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-black text-slate-800 focus:outline-none focus:border-blue-500 transition"
@@ -3023,8 +3656,12 @@ if (
 
                   <button
                     type="button"
-                    onClick={handleSaveExchangeRate}
-                    disabled={isSavingExchangeRate}
+                    onClick={
+                      handleSaveExchangeRate
+                    }
+                    disabled={
+                      isSavingExchangeRate
+                    }
                     className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-300 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition shadow-sm whitespace-nowrap"
                   >
                     {isSavingExchangeRate
@@ -3044,7 +3681,9 @@ if (
                       : 'text-red-600'
                   }`}
                 >
-                  {exchangeRateMessage}
+                  {
+                    exchangeRateMessage
+                  }
                 </div>
               )}
             </div>
@@ -3055,358 +3694,475 @@ if (
             POS
         ==================================================== */}
 
-        {activeTab === 'pos' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {activeTab ===
+          'pos' && (
+          <div className="space-y-4">
 
-            <div className="lg:col-span-2 space-y-4">
+            <WebOrdersModule
+              onLoadOrder={
+                handleLoadWebOrder
+              }
+              loadedOrderId={
+                loadedWebOrder?.id ||
+                null
+              }
+            />
 
-              <div className="flex flex-col sm:flex-row gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-4">
 
-                <input
-                  type="text"
-                  placeholder="🔍 Buscar producto por nombre o categoría..."
-                  value={searchTerm}
-                  onChange={e =>
-                    setSearchTerm(
-                      e.target.value
-                    )
-                  }
-                  className="flex-1 bg-white border border-slate-200/80 rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-blue-500 shadow-sm transition"
-                />
-
-                <div className="flex gap-1 overflow-x-auto pb-1 sm:pb-0">
-
-                  {categories.map(
-                    cat => (
-                      <button
-                        key={cat}
-                        onClick={() =>
-                          setSelectedCategory(
-                            cat
-                          )
-                        }
-                        className={`px-3.5 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition ${
-                          selectedCategory ===
-                          cat
-                            ? 'bg-blue-600 text-white shadow-sm'
-                            : 'bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    )
-                  )}
-
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
-
-                {filteredProducts.map(
-                  product => (
-                    <div
-                      key={product.id}
-                      onClick={() =>
-                        addToCart(
-                          product
-                        )
-                      }
-                      className={`bg-white border rounded-3xl p-4 flex flex-col justify-between cursor-pointer transition shadow-xs hover:shadow-md ${
-                        product.stock <=
-                        0
-                          ? 'opacity-50 border-rose-200 bg-rose-50/20'
-                          : 'border-slate-200/80 hover:border-blue-400 hover:-translate-y-0.5'
-                      }`}
-                    >
-                      <div>
-
-                        {product.image ? (
-                          <div className="w-full h-24 mb-2.5 rounded-2xl overflow-hidden bg-slate-100 border border-slate-100">
-                            <img
-                              src={
-                                product.image
-                              }
-                              alt={
-                                product.name
-                              }
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        ) : null}
-
-                        <div className="flex justify-between items-start gap-1">
-
-                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-lg">
-                            {
-                              product.category
-                            }
-                          </span>
-
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${
-                              product.stock >
-                              5
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : product.stock >
-                                  0
-                                ? 'bg-amber-50 text-amber-700'
-                                : 'bg-rose-100 text-rose-700'
-                            }`}
-                          >
-                            Stock:{' '}
-                            {
-                              product.stock
-                            }
-                          </span>
-
-                        </div>
-
-                        <h4 className="font-bold text-slate-800 text-xs mt-2.5 line-clamp-2">
-                          {
-                            product.name
-                          }
-                        </h4>
-
+                {loadedWebOrder && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-black text-emerald-800">
+                        🛍️ Pedido Web #
+                        {
+                          loadedWebOrder.id
+                        }{' '}
+                        cargado
                       </div>
 
-                      <div className="mt-4 pt-2 border-t border-slate-100 flex justify-between items-end">
-
-                        <div>
-                          <div className="text-sm font-black text-slate-900">
-                            $
-                            {product.price.toFixed(
-                              2
-                            )}
-                          </div>
-
-                          <div className="text-[10px] text-slate-400">
-                            Bs.{' '}
-                            {(
-                              product.price *
-                              exchangeRate
-                            ).toFixed(
-                              2
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center font-bold text-xs shadow-2xs">
-                          ＋
-                        </div>
-
+                      <div className="text-[11px] text-emerald-700 mt-1">
+                        Los productos están bloqueados para mantener el pedido original.
                       </div>
                     </div>
-                  )
+
+                    <div className="text-right">
+                      <div className="text-[10px] font-bold text-emerald-600 uppercase">
+                        Cliente
+                      </div>
+
+                      <div className="text-xs font-black text-emerald-900">
+                        {
+                          loadedWebOrder.customer_name
+                        }
+                      </div>
+                    </div>
+                  </div>
                 )}
 
-              </div>
-            </div>
-
-            {/* CARRITO */}
-
-            <div className="space-y-4">
-
-              <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm space-y-4 flex flex-col h-[calc(100vh-210px)] sticky top-20">
-
-                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-
-                  <h3 className="font-extrabold text-slate-800 text-sm">
-                    🛒 Carrito Actual
-                  </h3>
-
-                  <button
-                    onClick={() =>
-                      setCart([])
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="text"
+                    placeholder="🔍 Buscar producto por nombre o categoría..."
+                    value={
+                      searchTerm
                     }
-                    className="text-xs text-rose-500 font-bold hover:underline"
-                  >
-                    Vaciar
-                  </button>
+                    onChange={e =>
+                      setSearchTerm(
+                        e.target.value
+                      )
+                    }
+                    className="flex-1 bg-white border border-slate-200/80 rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-blue-500 shadow-sm transition"
+                  />
 
+                  <div className="flex gap-1 overflow-x-auto pb-1 sm:pb-0">
+                    {categories.map(
+                      cat => (
+                        <button
+                          key={cat}
+                          onClick={() =>
+                            setSelectedCategory(
+                              cat
+                            )
+                          }
+                          className={`px-3.5 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition ${
+                            selectedCategory ===
+                            cat
+                              ? 'bg-blue-600 text-white shadow-sm'
+                              : 'bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      )
+                    )}
+                  </div>
                 </div>
 
-                <POSCustomerSelector
-                  onSelectCustomer={c => {
-                    setClientName(
-                      c.name
-                    );
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
+                  {filteredProducts.map(
+                    product => (
+                      <div
+                        key={
+                          product.id
+                        }
+                        onClick={() =>
+                          addToCart(
+                            product
+                          )
+                        }
+                        className={`bg-white border rounded-3xl p-4 flex flex-col justify-between cursor-pointer transition shadow-xs hover:shadow-md ${
+                          product.stock <=
+                          0
+                            ? 'opacity-50 border-rose-200 bg-rose-50/20'
+                            : loadedWebOrder
+                            ? 'border-slate-200/80 hover:border-slate-300'
+                            : 'border-slate-200/80 hover:border-blue-400 hover:-translate-y-0.5'
+                        }`}
+                      >
+                        <div>
+                          {product.image ? (
+                            <div className="w-full h-24 mb-2.5 rounded-2xl overflow-hidden bg-slate-100 border border-slate-100">
+                              <img
+                                src={
+                                  product.image
+                                }
+                                alt={
+                                  product.name
+                                }
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : null}
 
-                    setClientDocument(
-                      c.document
-                    );
-
-                    setClientPhone(
-                      c.phone
-                    );
-                  }}
-                />
-
-                <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
-
-                  {cart.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs text-center p-6">
-                      <span className="text-3xl mb-2">
-                        🛍️
-                      </span>
-
-                      El carrito está vacío. Selecciona productos para facturar.
-                    </div>
-                  ) : (
-                    cart.map(
-                      item => (
-                        <div
-                          key={
-                            item.id
-                          }
-                          className="bg-slate-50/80 border border-slate-200/70 rounded-2xl p-3 flex justify-between items-center gap-2"
-                        >
-
-                          <div className="flex-1 min-w-0">
-
-                            <div className="font-bold text-xs text-slate-800 truncate">
+                          <div className="flex justify-between items-start gap-1">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-lg">
                               {
-                                item.name
+                                product.category
                               }
+                            </span>
+
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${
+                                product.stock >
+                                5
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : product.stock >
+                                    0
+                                  ? 'bg-amber-50 text-amber-700'
+                                  : 'bg-rose-100 text-rose-700'
+                              }`}
+                            >
+                              Stock:{' '}
+                              {
+                                product.stock
+                              }
+                            </span>
+                          </div>
+
+                          <h4 className="font-bold text-slate-800 text-xs mt-2.5 line-clamp-2">
+                            {
+                              product.name
+                            }
+                          </h4>
+                        </div>
+
+                        <div className="mt-4 pt-2 border-t border-slate-100 flex justify-between items-end">
+                          <div>
+                            <div className="text-sm font-black text-slate-900">
+                              $
+                              {product.price.toFixed(
+                                2
+                              )}
                             </div>
 
                             <div className="text-[10px] text-slate-400">
-                              $
-                              {item.price.toFixed(
+                              Bs.{' '}
+                              {(
+                                product.price *
+                                exchangeRate
+                              ).toFixed(
                                 2
-                              )}{' '}
-                              c/u
+                              )}
                             </div>
-
                           </div>
 
-                          <div className="flex items-center gap-2">
-
-                            <div className="flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-
-                              <button
-                                onClick={() =>
-                                  updateCartQuantity(
-                                    item.id,
-                                    -1
-                                  )
-                                }
-                                className="px-2 py-1 text-xs font-bold text-slate-600 hover:bg-slate-100"
-                              >
-                                -
-                              </button>
-
-                              <span className="px-2 text-xs font-bold">
-                                {
-                                  item.quantity
-                                }
-                              </span>
-
-                              <button
-                                onClick={() =>
-                                  updateCartQuantity(
-                                    item.id,
-                                    1
-                                  )
-                                }
-                                className="px-2 py-1 text-xs font-bold text-slate-600 hover:bg-slate-100"
-                              >
-                                +
-                              </button>
-
-                            </div>
-
-                            <button
-                              onClick={() =>
-                                removeFromCart(
-                                  item.id
-                                )
-                              }
-                              className="text-rose-500 hover:text-rose-700 text-xs font-bold p-1"
-                            >
-                              ×
-                            </button>
-
+                          <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center font-bold text-xs shadow-2xs">
+                            ＋
                           </div>
                         </div>
-                      )
+                      </div>
                     )
                   )}
-
                 </div>
+              </div>
 
-                <div className="border-t border-slate-100 pt-3 space-y-2">
+              {/* CARRITO */}
 
-                  <div className="flex justify-between text-xs text-slate-500">
-                    <span>
-                      Subtotal
-                    </span>
+              <div className="space-y-4">
+                <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm space-y-4 flex flex-col h-[calc(100vh-210px)] sticky top-20">
 
-                    <span>
-                      $
-                      {subtotalUSD.toFixed(
-                        2
-                      )}
-                    </span>
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <h3 className="font-extrabold text-slate-800 text-sm">
+                      🛒 Carrito Actual
+                    </h3>
+
+                    <button
+                      onClick={() => {
+                        if (
+                          loadedWebOrder
+                        ) {
+                          const confirmed =
+                            confirm(
+                              'Este pedido web se quitará del carrito local, pero seguirá aprobado en el sistema. ¿Desea continuar?'
+                            );
+
+                          if (
+                            !confirmed
+                          ) {
+                            return;
+                          }
+                        }
+
+                        setCart(
+                          []
+                        );
+
+                        setLoadedWebOrder(
+                          null
+                        );
+
+                        setClientName(
+                          ''
+                        );
+
+                        setClientPhone(
+                          ''
+                        );
+
+                        setClientDocument(
+                          ''
+                        );
+                      }}
+                      className="text-xs text-rose-500 font-bold hover:underline"
+                    >
+                      Vaciar
+                    </button>
                   </div>
 
-                  <div className="flex justify-between text-xs text-slate-500">
-                    <span>
-                      IVA (16%)
-                    </span>
+                  {loadedWebOrder ? (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3">
+                      <div className="text-[10px] uppercase font-bold text-emerald-600">
+                        Pedido Web
+                      </div>
 
-                    <span>
-                      $
-                      {ivaUSD.toFixed(
-                        2
+                      <div className="text-sm font-black text-emerald-900 mt-0.5">
+                        #
+                        {
+                          loadedWebOrder.id
+                        }
+                      </div>
+
+                      <div className="text-xs text-emerald-800 mt-1">
+                        {
+                          loadedWebOrder.customer_name
+                        }
+                      </div>
+
+                      {loadedWebOrder.customer_phone && (
+                        <div className="text-[10px] text-emerald-700 mt-1">
+                          Tel:{' '}
+                          {
+                            loadedWebOrder.customer_phone
+                          }
+                        </div>
                       )}
-                    </span>
-                  </div>
+                    </div>
+                  ) : (
+                    <POSCustomerSelector
+                      onSelectCustomer={c => {
+                        setClientName(
+                          c.name
+                        );
 
-                  <div className="flex justify-between text-sm font-black text-slate-900 pt-1 border-t border-slate-100">
-                    <span>
-                      Total USD
-                    </span>
+                        setClientDocument(
+                          c.document
+                        );
 
-                    <span>
-                      $
-                      {totalUSD.toFixed(
-                        2
-                      )}
-                    </span>
-                  </div>
+                        setClientPhone(
+                          c.phone
+                        );
+                      }}
+                    />
+                  )}
 
-                  <div className="flex justify-between text-xs font-bold text-blue-600">
-                    <span>
-                      Total Bs.
-                    </span>
+                  <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+                    {cart.length ===
+                    0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs text-center p-6">
+                        <span className="text-3xl mb-2">
+                          🛍️
+                        </span>
 
-                    <span>
-                      Bs.{' '}
-                      {totalBs.toFixed(
-                        2
-                      )}
-                    </span>
-                  </div>
+                        El carrito está vacío. Selecciona productos para facturar.
+                      </div>
+                    ) : (
+                      cart.map(
+                        item => (
+                          <div
+                            key={
+                              item.id
+                            }
+                            className="bg-slate-50/80 border border-slate-200/70 rounded-2xl p-3 flex justify-between items-center gap-2"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="font-bold text-xs text-slate-800 truncate">
+                                {
+                                  item.name
+                                }
+                              </div>
 
-                  <button
-                    disabled={
-                      cart.length ===
-                        0 ||
-                      !isCashOpen ||
-                      !activeRegisterId
-                    }
-                    onClick={() =>
-                      setIsCheckoutModalOpen(
-                        true
+                              <div className="text-[10px] text-slate-400">
+                                $
+                                {item.price.toFixed(
+                                  2
+                                )}{' '}
+                                c/u
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                                <button
+                                  onClick={() =>
+                                    updateCartQuantity(
+                                      item.id,
+                                      -1
+                                    )
+                                  }
+                                  className="px-2 py-1 text-xs font-bold text-slate-600 hover:bg-slate-100"
+                                >
+                                  -
+                                </button>
+
+                                <span className="px-2 text-xs font-bold">
+                                  {
+                                    item.quantity
+                                  }
+                                </span>
+
+                                <button
+                                  onClick={() =>
+                                    updateCartQuantity(
+                                      item.id,
+                                      1
+                                    )
+                                  }
+                                  className="px-2 py-1 text-xs font-bold text-slate-600 hover:bg-slate-100"
+                                >
+                                  +
+                                </button>
+                              </div>
+
+                              <button
+                                onClick={() =>
+                                  removeFromCart(
+                                    item.id
+                                  )
+                                }
+                                className="text-rose-500 hover:text-rose-700 text-xs font-bold p-1"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                        )
                       )
-                    }
-                    className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-3 rounded-2xl text-xs transition shadow-md mt-2"
-                  >
-                    {!isCashOpen
-                      ? 'Caja Cerrada 🔒'
-                      : 'Proceder al Pago 💳'}
-                  </button>
+                    )}
+                  </div>
 
+                  <div className="border-t border-slate-100 pt-3 space-y-2">
+                    <div className="flex justify-between text-xs text-slate-500">
+                      <span>
+                        Subtotal
+                      </span>
+
+                      <span>
+                        $
+                        {subtotalUSD.toFixed(
+                          2
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-xs text-slate-500">
+                      <span>
+                        IVA (16%)
+                      </span>
+
+                      <span>
+                        $
+                        {ivaUSD.toFixed(
+                          2
+                        )}
+                      </span>
+                    </div>
+
+                    {loadedWebOrder &&
+                      loadedWebOrder.order_type ===
+                        'Delivery' && (
+                        <div className="flex justify-between text-xs text-slate-500">
+                          <span>
+                            Delivery (
+                            {
+                              loadedWebOrder.delivery_zone
+                            })
+                          </span>
+
+                          <span>
+                            $
+                            {(
+                              Number(
+                                loadedWebOrder.totalUSD
+                              ) -
+                              Number(
+                                loadedWebOrder.subtotalUSD
+                              )
+                            ).toFixed(
+                              2
+                            )}
+                          </span>
+                        </div>
+                      )}
+
+                    <div className="flex justify-between text-sm font-black text-slate-900 pt-1 border-t border-slate-100">
+                      <span>
+                        Total USD
+                      </span>
+
+                      <span>
+                        $
+                        {totalUSD.toFixed(
+                          2
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-xs font-bold text-blue-600">
+                      <span>
+                        Total Bs.
+                      </span>
+
+                      <span>
+                        Bs.{' '}
+                        {totalBs.toFixed(
+                          2
+                        )}
+                      </span>
+                    </div>
+
+                    <button
+                      disabled={
+                        cart.length ===
+                          0 ||
+                        !isCashOpen ||
+                        !activeRegisterId
+                      }
+                      onClick={() =>
+                        setIsCheckoutModalOpen(
+                          true
+                        )
+                      }
+                      className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-3 rounded-2xl text-xs transition shadow-md mt-2"
+                    >
+                      {!isCashOpen
+                        ? 'Caja Cerrada 🔒'
+                        : loadedWebOrder
+                        ? 'Facturar Pedido Web 💳'
+                        : 'Proceder al Pago 💳'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -3420,13 +4176,10 @@ if (
         {activeTab ===
           'inventory' && (
           <div className="space-y-6">
-
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
               {/* NUEVO PRODUCTO */}
 
               <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
-
                 <h3 className="font-extrabold text-slate-800 text-base">
                   ➕ Nuevo Producto
                 </h3>
@@ -3437,7 +4190,6 @@ if (
                   }
                   className="space-y-3"
                 >
-
                   <div>
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">
                       Nombre *
@@ -3446,9 +4198,7 @@ if (
                     <input
                       type="text"
                       required
-                      value={
-                        newName
-                      }
+                      value={newName}
                       onChange={e =>
                         setNewName(
                           e.target
@@ -3464,30 +4214,35 @@ if (
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">
                       Descripción del plato
                     </label>
+
                     <textarea
-                      value={newDescription}
+                      value={
+                        newDescription
+                      }
                       onChange={e =>
-                        setNewDescription(e.target.value)
+                        setNewDescription(
+                          e.target
+                            .value
+                        )
                       }
                       maxLength={500}
                       rows={3}
                       placeholder="Ej. Roll de salmón, aguacate y queso crema."
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs resize-none"
                     />
+
                     <p className="text-[10px] text-slate-400 mt-1">
                       Describe brevemente los ingredientes o características del plato.
                     </p>
                   </div>
 
                   <div className="space-y-1.5">
-
                     <label className="block text-[11px] font-bold text-slate-600">
                       Imagen del Producto (ImgBB)
                     </label>
 
                     {newImage ? (
                       <div className="relative w-full h-32 rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center group">
-
                         <img
                           src={
                             newImage
@@ -3497,7 +4252,6 @@ if (
                         />
 
                         <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
-
                           <button
                             type="button"
                             onClick={() => {
@@ -3512,12 +4266,10 @@ if (
                           >
                             Eliminar 🗑️
                           </button>
-
                         </div>
                       </div>
                     ) : (
                       <div className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-2xl p-4 text-center bg-slate-50/50 transition cursor-pointer relative">
-
                         <input
                           type="file"
                           accept="image/*"
@@ -3531,7 +4283,6 @@ if (
                         />
 
                         <div className="space-y-1">
-
                           <span className="text-xl">
                             📷
                           </span>
@@ -3543,7 +4294,6 @@ if (
                           <p className="text-[10px] text-slate-400">
                             PNG, JPG o WEBP
                           </p>
-
                         </div>
                       </div>
                     )}
@@ -3560,14 +4310,14 @@ if (
 
                     {selectedFileName && (
                       <p className="text-[10px] text-slate-400 truncate">
-                        {selectedFileName}
+                        {
+                          selectedFileName
+                        }
                       </p>
                     )}
-
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
-
                     <div>
                       <label className="block text-[11px] font-bold text-slate-600 mb-1">
                         Costo ($)
@@ -3612,13 +4362,10 @@ if (
                         className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs"
                       />
                     </div>
-
                   </div>
 
                   <div className="space-y-1.5">
-
                     <div className="flex justify-between items-center">
-
                       <label className="block text-[11px] font-bold text-slate-600">
                         Categoría
                       </label>
@@ -3636,12 +4383,10 @@ if (
                           ? 'Cancelar'
                           : '+ Crear Categoría'}
                       </button>
-
                     </div>
 
                     {isAddingCategory ? (
                       <div className="flex gap-2">
-
                         <input
                           type="text"
                           placeholder="Nueva categoría..."
@@ -3666,7 +4411,6 @@ if (
                         >
                           Añadir
                         </button>
-
                       </div>
                     ) : (
                       <select
@@ -3693,7 +4437,6 @@ if (
                         )}
                       </select>
                     )}
-
                   </div>
 
                   <div>
@@ -3719,7 +4462,6 @@ if (
                   </div>
 
                   <div className="flex items-center gap-2 pt-1">
-
                     <input
                       type="checkbox"
                       id="taxableCheck"
@@ -3741,7 +4483,6 @@ if (
                     >
                       Aplica IVA (16%)
                     </label>
-
                   </div>
 
                   <button
@@ -3750,22 +4491,18 @@ if (
                   >
                     Guardar Producto 💾
                   </button>
-
                 </form>
               </div>
 
               {/* LISTADO INVENTARIO */}
 
               <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
-
                 <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-
                   <h3 className="font-extrabold text-slate-800 text-base">
                     📦 Listado de Inventario
                   </h3>
 
                   <div className="flex gap-2">
-
                     <button
                       onClick={() =>
                         setInventoryFilterMode(
@@ -3797,14 +4534,11 @@ if (
                     >
                       Stock Bajo
                     </button>
-
                   </div>
                 </div>
 
                 <div className="overflow-x-auto">
-
                   <table className="w-full text-left text-xs border-collapse">
-
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 uppercase font-bold text-[10px]">
                         <th className="p-3">
@@ -3834,7 +4568,6 @@ if (
                     </thead>
 
                     <tbody className="divide-y divide-slate-100">
-
                       {products
                         .filter(
                           p =>
@@ -3842,90 +4575,128 @@ if (
                               'all' ||
                             p.stock <= 5
                         )
-                        .map(p => (
-                          <tr
-                            key={
-                              p.id
-                            }
-                            className="hover:bg-slate-50/60 transition"
-                          >
-
-                            <td className="p-3 font-bold text-slate-800 flex items-center gap-2">
-
-                              {p.image && (
-                                <img
-                                  src={
-                                    p.image
-                                  }
-                                  alt=""
-                                  className="w-8 h-8 rounded-lg object-cover"
-                                />
-                              )}
-
-                              <span>
-                                {
-                                  p.name
-                                }
-                              </span>
-
-                            </td>
-
-                            <td className="p-3 text-slate-500">
-                              {p.category}
-                            </td>
-
-                            <td
-                              className="p-3 text-slate-500 max-w-xs truncate"
-                              title={p.description || ''}
+                        .map(
+                          p => (
+                            <tr
+                              key={
+                                p.id
+                              }
+                              className="hover:bg-slate-50/60 transition"
                             >
-                              {p.description || 'Sin descripción'}
-                            </td>
+                              <td className="p-3 font-bold text-slate-800 flex items-center gap-2">
+                                {p.image && (
+                                  <img
+                                    src={
+                                      p.image
+                                    }
+                                    alt=""
+                                    className="w-8 h-8 rounded-lg object-cover"
+                                  />
+                                )}
 
-                            <td className="p-3 font-bold text-slate-800">
-                              ${p.price.toFixed(2)}
-                            </td>
+                                <span>
+                                  {
+                                    p.name
+                                  }
+                                </span>
+                              </td>
 
-                            <td className={`p-3 font-bold ${p.stock <= 5 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                              {p.stock}
-                            </td>
+                              <td className="p-3 text-slate-500">
+                                {
+                                  p.category
+                                }
+                              </td>
 
-                            <td className="p-3 text-right">
-                              <div className="flex justify-end gap-1.5 flex-wrap">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedProductForRestock(p);
-                                    setRestockAmount('');
-                                    setIsRestockModalOpen(true);
-                                  }}
-                                  className="px-2.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg font-bold hover:bg-emerald-100"
-                                >
-                                  + Stock
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => openEditModal(p)}
-                                  className="px-2.5 py-1.5 bg-blue-50 text-blue-700 rounded-lg font-bold hover:bg-blue-100"
-                                >
-                                  Editar
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteProduct(p.id, p.name)}
-                                  className="px-2.5 py-1.5 bg-rose-50 text-rose-700 rounded-lg font-bold hover:bg-rose-100"
-                                >
-                                  Eliminar
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
+                              <td
+                                className="p-3 text-slate-500 max-w-xs truncate"
+                                title={
+                                  p.description ||
+                                  ''
+                                }
+                              >
+                                {p.description ||
+                                  'Sin descripción'}
+                              </td>
+
+                              <td className="p-3 font-bold text-slate-800">
+                                $
+                                {p.price.toFixed(
+                                  2
+                                )}
+                              </td>
+
+                              <td
+                                className={`p-3 font-bold ${
+                                  p.stock <=
+                                  5
+                                    ? 'text-amber-600'
+                                    : 'text-emerald-600'
+                                }`}
+                              >
+                                {
+                                  p.stock
+                                }
+                              </td>
+
+                              <td className="p-3 text-right">
+                                <div className="flex justify-end gap-1.5 flex-wrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedProductForRestock(
+                                        p
+                                      );
+
+                                      setRestockAmount(
+                                        ''
+                                      );
+
+                                      setIsRestockModalOpen(
+                                        true
+                                      );
+                                    }}
+                                    className="px-2.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg font-bold hover:bg-emerald-100"
+                                  >
+                                    + Stock
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      openEditModal(
+                                        p
+                                      )
+                                    }
+                                    className="px-2.5 py-1.5 bg-blue-50 text-blue-700 rounded-lg font-bold hover:bg-blue-100"
+                                  >
+                                    Editar
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleDeleteProduct(
+                                        p.id,
+                                        p.name
+                                      )
+                                    }
+                                    className="px-2.5 py-1.5 bg-rose-50 text-rose-700 rounded-lg font-bold hover:bg-rose-100"
+                                  >
+                                    Eliminar
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        )}
 
                       {products.filter(
                         p =>
-                          inventoryFilterMode === 'all' ||
+                          inventoryFilterMode ===
+                            'all' ||
                           p.stock <= 5
-                      ).length === 0 && (
+                      ).length ===
+                        0 && (
                         <tr>
                           <td
                             colSpan={6}
@@ -3945,492 +4716,1641 @@ if (
 
         {/* ====================================================
             REPORTES
-            ==================================================== */}
-            {activeTab === 'reports' && (
-              <div className="space-y-6">
-                <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
-                  <div className="flex flex-col sm:flex-row justify-between gap-3 items-start sm:items-center border-b border-slate-100 pb-4">
-                    <div>
-                      <h3 className="text-lg font-extrabold text-slate-800">
-                        📊 Reportes de Ventas
-                      </h3>
-                      <p className="text-xs text-slate-500">
-                        Seguimiento de ventas registradas en la base de datos.
-                      </p>
-                    </div>
-                    <select
-                      value={reportFilterPeriod}
-                      onChange={e =>
-                        setReportFilterPeriod(
-                          e.target.value as 'all' | 'today' | 'week' | 'month'
-                        )
-                      }
-                      className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold"
-                    >
-                      <option value="all">Todo</option>
-                      <option value="today">Hoy</option>
-                      <option value="week">Últimos 7 días</option>
-                      <option value="month">Últimos 30 días</option>
-                    </select>
-                  </div>
+        ==================================================== */}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
-                    <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
-                      <div className="text-[10px] uppercase font-bold text-blue-600">Ventas</div>
-                      <div className="text-xl font-black text-slate-900 mt-1">
-                        ${salesHistory.reduce((a, s) => a + s.totalUSD, 0).toFixed(2)}
-                      </div>
-                    </div>
-                    <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4">
-                      <div className="text-[10px] uppercase font-bold text-emerald-600">Transacciones</div>
-                      <div className="text-xl font-black text-slate-900 mt-1">
-                        {salesHistory.length}
-                      </div>
-                    </div>
-                    <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
-                      <div className="text-[10px] uppercase font-bold text-amber-700">Ticket promedio</div>
-                      <div className="text-xl font-black text-slate-900 mt-1">
-                        ${salesHistory.length ? (salesHistory.reduce((a, s) => a + s.totalUSD, 0) / salesHistory.length).toFixed(2) : '0.00'}
-                      </div>
-                    </div>
-                  </div>
+        {activeTab ===
+          'reports' && (
+          <div className="space-y-6">
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
+              <div className="flex flex-col sm:flex-row justify-between gap-3 items-start sm:items-center border-b border-slate-100 pb-4">
+                <div>
+                  <h3 className="text-lg font-extrabold text-slate-800">
+                    📊 Reportes de Ventas
+                  </h3>
 
-                  <div className="h-80 mt-6">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={(() => {
-                          const map: Record<string, number> = {};
-                          salesHistory.forEach(s => {
-                            const d = new Date(s.created_at || s.date);
-                            const key = `${d.getDate()}/${d.getMonth() + 1}`;
-                            map[key] = (map[key] || 0) + s.totalUSD;
-                          });
-                          return Object.entries(map)
-                            .slice(-14)
-                            .map(([date, total]) => ({
-                              date,
-                              total: Number(total.toFixed(2))
-                            }));
-                        })()}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="total" name="Ventas USD" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 uppercase text-[10px] font-bold">
-                        <th className="p-3">ID</th>
-                        <th className="p-3">Fecha</th>
-                        <th className="p-3">Cliente</th>
-                        <th className="p-3">Método</th>
-                        <th className="p-3">Total USD</th>
-                        <th className="p-3">Total Bs.</th>
-                        <th className="p-3">Caja</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {salesHistory
-                        .filter(s => {
-                          if (reportFilterPeriod === 'all') return true;
-                          const date = new Date(s.created_at || s.date);
-                          const now = new Date();
-                          const diff = now.getTime() - date.getTime();
-                          if (reportFilterPeriod === 'today') {
-                            return date.toDateString() === now.toDateString();
-                          }
-                          if (reportFilterPeriod === 'week') return diff <= 7 * 86400000;
-                          return diff <= 30 * 86400000;
-                        })
-                        .map(s => (
-                          <tr key={s.id} className="hover:bg-slate-50/70">
-                            <td className="p-3 font-bold">#{s.id}</td>
-                            <td className="p-3 text-slate-500">
-                              {new Date(s.created_at || s.date).toLocaleString()}
-                            </td>
-                            <td className="p-3 font-semibold">
-                              {s.clientName || 'Cliente Genérico'}
-                            </td>
-                            <td className="p-3">{s.paymentMethod}</td>
-                            <td className="p-3 font-black">${s.totalUSD.toFixed(2)}</td>
-                            <td className="p-3">Bs. {s.totalBs.toFixed(2)}</td>
-                            <td className="p-3">#{s.cashRegisterId || '—'}</td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* ====================================================
-                CUENTAS / FINANZAS
-            ==================================================== */}
-            {activeTab === 'accounts' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {userPermissions.includes('view_credits') && (
-                  <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
-                    <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                      <div>
-                        <h3 className="text-lg font-extrabold">💳 Cuentas por Cobrar</h3>
-                        <p className="text-xs text-slate-500">Ventas a crédito / fiado.</p>
-                      </div>
-                      <span className="bg-amber-50 text-amber-700 border border-amber-100 rounded-xl px-3 py-1 text-xs font-bold">
-                        {credits.filter(c => c.status === 'Pendiente').length} pendientes
-                      </span>
-                    </div>
-                    <div className="mt-4 space-y-2 max-h-[520px] overflow-y-auto">
-                      {credits.length === 0 ? (
-                        <div className="text-center py-10 text-slate-400 text-xs">
-                          No hay cuentas por cobrar.
-                        </div>
-                      ) : credits.map(c => (
-                        <div key={c.id} className="border border-slate-200 rounded-2xl p-4 flex justify-between gap-3">
-                          <div>
-                            <div className="font-bold text-sm">{c.clientName}</div>
-                            <div className="text-[10px] text-slate-500 mt-1">
-                              {c.clientDocument} · {c.clientPhone}
-                            </div>
-                            <div className="text-[10px] text-slate-400 mt-1">Venta #{c.saleId} · {c.date}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-black">${c.totalDebtUSD.toFixed(2)}</div>
-                            <div className="text-[10px] text-slate-500">Bs. {c.totalDebtBs.toFixed(2)}</div>
-                            <span className={`inline-block mt-1 px-2 py-1 rounded-lg text-[9px] font-bold ${c.status === 'Pagado' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-                              {c.status}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {userPermissions.includes('view_payables') || userPermissions.includes('manage_payables') ? (
-                  <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
-                    <div className="border-b border-slate-100 pb-3">
-                      <h3 className="text-lg font-extrabold">📑 Cuentas por Pagar</h3>
-                      <p className="text-xs text-slate-500">Proveedores y obligaciones pendientes.</p>
-                    </div>
-                    <form onSubmit={handleAddPayable} className="mt-4 bg-slate-50/70 border border-slate-200 rounded-2xl p-4 space-y-2.5">
-                      <input
-                        value={newProviderName}
-                        onChange={e => setNewProviderName(e.target.value)}
-                        placeholder="Proveedor *"
-                        required
-                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs"
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <input value={newProviderDoc} onChange={e => setNewProviderDoc(e.target.value)} placeholder="RIF / Documento" className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs" />
-                        <input value={newPayableAmountUSD} onChange={e => setNewPayableAmountUSD(e.target.value)} placeholder="Monto USD *" type="number" step="0.01" min="0" required className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs" />
-                      </div>
-                      <input value={newPayableDesc} onChange={e => setNewPayableDesc(e.target.value)} placeholder="Descripción" className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs" />
-                      <input value={newDueDate} onChange={e => setNewDueDate(e.target.value)} type="date" className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs" />
-                      <button className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-xl py-2.5 text-xs font-bold">Registrar Cuenta</button>
-                    </form>
-                    <div className="mt-4 space-y-2 max-h-[350px] overflow-y-auto">
-                      {payables.map(p => (
-                        <div key={p.id} className="border border-slate-200 rounded-2xl p-4 flex justify-between gap-3">
-                          <div>
-                            <div className="font-bold text-sm">{p.providerName}</div>
-                            <div className="text-[10px] text-slate-500">{p.providerDocument} · {p.description}</div>
-                            <div className="text-[10px] text-slate-400 mt-1">Vence: {p.dueDate}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-black">${p.totalDebtUSD.toFixed(2)}</div>
-                            <div className="text-[10px] text-slate-500">Bs. {p.totalDebtBs.toFixed(2)}</div>
-                            <span className="inline-block mt-1 bg-amber-50 text-amber-700 px-2 py-1 rounded-lg text-[9px] font-bold">{p.status}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            )}
-
-            {/* ====================================================
-                CLIENTES
-            ==================================================== */}
-            {activeTab === 'customers' && <CustomersDirectoryModule />}
-
-            {/* ====================================================
-                ROLES
-            ==================================================== */}
-            {activeTab === 'roles' && userPermissions.includes('manage_roles') && (
-              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
-                <RolesManagerModule />
-              </div>
-            )}
-          </main>
-
-          {/* ====================================================
-              MODAL ABRIR CAJA
-          ==================================================== */}
-          {showOpenCashModal && (
-            <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6">
-                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                  <div>
-                    <h3 className="text-lg font-black text-slate-900">🔓 Abrir Caja</h3>
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      Usuario: {currentUserObj?.name || authenticatedUser?.email || '—'}
-                    </p>
-                  </div>
-                  <button type="button" onClick={() => setShowOpenCashModal(false)} className="text-slate-400 hover:text-slate-700 text-2xl">×</button>
-                </div>
-                <form onSubmit={handleOpenCashSubmit} className="space-y-4 pt-5">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Monto inicial USD</label>
-                    <input value={openingUSD} onChange={e => setOpeningUSD(e.target.value)} type="number" step="0.01" min="0" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm" placeholder="0.00" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Monto inicial Bs.</label>
-                    <input value={openingBs} onChange={e => setOpeningBs(e.target.value)} type="number" step="0.01" min="0" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm" placeholder="0.00" />
-                  </div>
-                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-2xl">Abrir Caja</button>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* ====================================================
-              MODAL CERRAR CAJA
-          ==================================================== */}
-          {showCloseCashModal && (
-            <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6">
-                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                  <div>
-                    <h3 className="text-lg font-black text-slate-900">🔒 Arqueo / Cerrar Caja</h3>
-                    <p className="text-[10px] text-slate-500 mt-1">Caja #{activeRegisterId || '—'}</p>
-                  </div>
-                  <button type="button" onClick={() => setShowCloseCashModal(false)} className="text-slate-400 hover:text-slate-700 text-2xl">×</button>
-                </div>
-                <div className="pt-5 space-y-4">
-                  <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-xs text-blue-900">
-                    El cierre se realizará sobre la caja abierta en la base de datos para este usuario.
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Efectivo contado USD</label>
-                    <input value={countedUSD} onChange={e => setCountedUSD(e.target.value)} type="number" step="0.01" min="0" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm" placeholder="0.00" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Efectivo contado Bs.</label>
-                    <input value={countedBs} onChange={e => setCountedBs(e.target.value)} type="number" step="0.01" min="0" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm" placeholder="0.00" />
-                  </div>
-                  <button type="button" onClick={handleCloseCashSubmit} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-2xl">Cerrar y Arquear Caja</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ====================================================
-              MODAL CHECKOUT
-          ==================================================== */}
-          {isCheckoutModalOpen && (
-            <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-              <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl p-6 my-8">
-                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                  <div>
-                    <h3 className="text-lg font-black">💳 Confirmar Venta</h3>
-                    <p className="text-[10px] text-slate-500">Caja #{activeRegisterId || '—'} · {currentUserObj?.name || 'Usuario'}</p>
-                  </div>
-                  <button type="button" onClick={() => setIsCheckoutModalOpen(false)} className="text-slate-400 text-2xl">×</button>
-                </div>
-
-                <form onSubmit={handleCheckout} className="space-y-4 pt-5">
-                  <POSCustomerSelector
-                    onSelectCustomer={c => {
-                      setClientName(c.name);
-                      setClientDocument(c.document);
-                      setClientPhone(c.phone);
-                    }}
-                  />
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Método de pago</label>
-                      <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as PaymentMethodType)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-3 text-xs font-bold">
-                        <option>Efectivo USD</option>
-                        <option>Efectivo Bs</option>
-                        <option>Pago Móvil</option>
-                        <option>Zelle</option>
-                        <option>Binance Pay</option>
-                        <option>Crédito / Fiado</option>
-                      </select>
-                    </div>
-                    {paymentMethod === 'Efectivo USD' && (
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Efectivo recibido USD</label>
-                        <input value={cashGivenUSD} onChange={e => setCashGivenUSD(e.target.value)} type="number" step="0.01" min="0" required className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-3 text-xs" placeholder="0.00" />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
-                    <div className="flex justify-between text-xs"><span>Subtotal</span><b>${subtotalUSD.toFixed(2)}</b></div>
-                    <div className="flex justify-between text-xs"><span>IVA</span><b>${ivaUSD.toFixed(2)}</b></div>
-                    <div className="flex justify-between text-base font-black border-t pt-2"><span>Total USD</span><b>${totalUSD.toFixed(2)}</b></div>
-                    <div className="flex justify-between text-xs font-bold text-blue-600"><span>Total Bs.</span><b>Bs. {totalBs.toFixed(2)}</b></div>
-                    {paymentMethod === 'Efectivo USD' && Number(cashGivenUSD || 0) >= totalUSD && (
-                      <div className="flex justify-between text-xs text-emerald-700 font-bold border-t pt-2">
-                        <span>Cambio</span>
-                        <b>${(Number(cashGivenUSD || 0) - totalUSD).toFixed(2)}</b>
-                      </div>
-                    )}
-                  </div>
-
-                  <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-2xl shadow-md">Confirmar y Registrar Venta</button>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* ====================================================
-              MODAL REPOSICIÓN
-          ==================================================== */}
-          {isRestockModalOpen && selectedProductForRestock && (
-            <div className="fixed inset-0 z-[100] bg-slate-950/60 flex items-center justify-center p-4">
-              <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6">
-                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                  <h3 className="font-black">📦 Reabastecer Producto</h3>
-                  <button type="button" onClick={() => setIsRestockModalOpen(false)} className="text-slate-400 text-2xl">×</button>
-                </div>
-                <form onSubmit={handleRestock} className="pt-5 space-y-4">
-                  <div className="bg-slate-50 rounded-2xl p-4">
-                    <div className="font-bold text-sm">{selectedProductForRestock.name}</div>
-                    <div className="text-xs text-slate-500 mt-1">Stock actual: {selectedProductForRestock.stock}</div>
-                  </div>
-                  <input autoFocus required type="number" min="1" step="1" value={restockAmount} onChange={e => setRestockAmount(e.target.value)} placeholder="Cantidad a agregar" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm" />
-                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl py-3 font-bold">Reabastecer</button>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* ====================================================
-              MODAL EDITAR PRODUCTO
-          ==================================================== */}
-          {isEditModalOpen && editingProduct && (
-            <div className="fixed inset-0 z-[100] bg-slate-950/60 flex items-center justify-center p-4 overflow-y-auto">
-              <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-6 my-6">
-                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                  <h3 className="font-black">✏️ Editar Producto</h3>
-                  <button type="button" onClick={() => setIsEditModalOpen(false)} className="text-slate-400 text-2xl">×</button>
-                </div>
-                <form onSubmit={handleUpdateProduct} className="pt-5 space-y-3">
-                  <input required value={editName} onChange={e => setEditName(e.target.value)} placeholder="Nombre" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs" />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input required type="number" step="0.01" value={editPrice} onChange={e => setEditPrice(e.target.value)} placeholder="Precio venta" className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs" />
-                    <input type="number" step="0.01" value={editCostPrice} onChange={e => setEditCostPrice(e.target.value)} placeholder="Costo" className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs" />
-                  </div>
-                  <input required type="number" min="0" value={editStock} onChange={e => setEditStock(e.target.value)} placeholder="Stock" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs" />
-                  <select value={editCategory} onChange={e => setEditCategory(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold">
-                    {categoriesList.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                  </select>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Descripción del plato</label>
-                    <textarea
-                      value={editDescription}
-                      onChange={e => setEditDescription(e.target.value)}
-                      maxLength={500}
-                      rows={3}
-                      placeholder="Describe brevemente el plato..."
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs resize-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Imagen</label>
-                    {editImage ? <img src={editImage} alt="Vista previa" className="w-full h-32 object-cover rounded-2xl border" /> : null}
-                    <input type="file" accept="image/*" onChange={e => handleImageUploadToImgBB(e, true)} className="w-full mt-2 text-xs" />
-                  </div>
-                  <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-2xl py-3 font-bold">Guardar Cambios</button>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* ====================================================
-              MODAL VENTA EXITOSA / TICKET
-          ==================================================== */}
-          {successModalData?.isOpen && (
-            <div className="fixed inset-0 z-[110] bg-slate-950/70 flex items-center justify-center p-4 overflow-y-auto">
-              <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 my-6">
-                <div className="text-center">
-                  <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-3xl mx-auto">✓</div>
-                  <h3 className="text-xl font-black mt-4">¡Venta registrada!</h3>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {successModalData.clientName || 'Cliente Genérico'}
+                  <p className="text-xs text-slate-500">
+                    Seguimiento de ventas registradas en la base de datos.
                   </p>
                 </div>
 
-                <div className="bg-slate-50 rounded-2xl p-4 mt-5 space-y-2 text-xs">
-                  <div className="flex justify-between"><span>Total</span><b>${lastPrintedSale?.totalUSD?.toFixed(2) || totalUSD.toFixed(2)}</b></div>
-                  {successModalData.changeUSD > 0 && (
-                    <div className="flex justify-between text-emerald-700"><span>Cambio USD</span><b>${successModalData.changeUSD.toFixed(2)}</b></div>
-                  )}
-                  {successModalData.changeBs > 0 && (
-                    <div className="flex justify-between text-emerald-700"><span>Cambio Bs.</span><b>Bs. {successModalData.changeBs.toFixed(2)}</b></div>
-                  )}
-                  <div className="flex justify-between"><span>Método</span><b>{lastPrintedSale?.paymentMethod || paymentMethod}</b></div>
-                  <div className="flex justify-between"><span>Caja</span><b>#{lastPrintedSale?.cashRegisterId || activeRegisterId || '—'}</b></div>
+                <select
+                  value={
+                    reportFilterPeriod
+                  }
+                  onChange={e =>
+                    setReportFilterPeriod(
+                      e.target
+                        .value as
+                        | 'all'
+                        | 'today'
+                        | 'week'
+                        | 'month'
+                    )
+                  }
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold"
+                >
+                  <option value="all">
+                    Todo
+                  </option>
+
+                  <option value="today">
+                    Hoy
+                  </option>
+
+                  <option value="week">
+                    Últimos 7 días
+                  </option>
+
+                  <option value="month">
+                    Últimos 30 días
+                  </option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
+                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
+                  <div className="text-[10px] uppercase font-bold text-blue-600">
+                    Ventas
+                  </div>
+
+                  <div className="text-xl font-black text-slate-900 mt-1">
+                    $
+                    {salesHistory
+                      .reduce(
+                        (a, s) =>
+                          a +
+                          s.totalUSD,
+                        0
+                      )
+                      .toFixed(2)}
+                  </div>
                 </div>
 
-                <div className="mt-5 space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-2xl py-3 font-bold"
-                  >
-                    🖨️ Imprimir Ticket
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSuccessModalData(null);
-                      setLastPrintedSale(null);
-                    }}
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-2xl py-3 font-bold"
-                  >
-                    Listo
-                  </button>
+                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4">
+                  <div className="text-[10px] uppercase font-bold text-emerald-600">
+                    Transacciones
+                  </div>
+
+                  <div className="text-xl font-black text-slate-900 mt-1">
+                    {
+                      salesHistory.length
+                    }
+                  </div>
                 </div>
 
-                {lastPrintedSale && (
-                  <div className="hidden print:block print-ticket mt-4 text-black text-xs">
-                    <div className="text-center font-black text-base">POS ENTERPRISE</div>
-                    <div className="text-center">Comprobante de Venta</div>
-                    <div className="border-b border-dashed border-black my-2" />
-                    <div>Venta: #{lastPrintedSale.id}</div>
-                    <div>Fecha: {lastPrintedSale.date}</div>
-                    <div>Cliente: {lastPrintedSale.clientName || 'Cliente Genérico'}</div>
-                    <div>Caja: #{lastPrintedSale.cashRegisterId || '—'}</div>
-                    <div className="border-b border-dashed border-black my-2" />
-                    {lastPrintedSale.items.map((item: CartItem) => (
-                      <div key={item.id} className="flex justify-between gap-2">
-                        <span>{item.quantity} x {item.name}</span>
-                        <span>${(item.quantity * item.price).toFixed(2)}</span>
+                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
+                  <div className="text-[10px] uppercase font-bold text-amber-700">
+                    Ticket promedio
+                  </div>
+
+                  <div className="text-xl font-black text-slate-900 mt-1">
+                    $
+                    {salesHistory.length
+                      ? (
+                          salesHistory.reduce(
+                            (a, s) =>
+                              a +
+                              s.totalUSD,
+                            0
+                          ) /
+                          salesHistory.length
+                        ).toFixed(
+                          2
+                        )
+                      : '0.00'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="h-80 mt-6">
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                >
+                  <BarChart
+                    data={(() => {
+                      const map: Record<
+                        string,
+                        number
+                      > = {};
+
+                      salesHistory.forEach(
+                        s => {
+                          const d =
+                            new Date(
+                              s.created_at ||
+                                s.date
+                            );
+
+                          const key = `${d.getDate()}/${d.getMonth() + 1}`;
+
+                          map[key] =
+                            (map[key] ||
+                              0) +
+                            s.totalUSD;
+                        }
+                      );
+
+                      return Object.entries(
+                        map
+                      )
+                        .slice(-14)
+                        .map(
+                          ([
+                            date,
+                            total
+                          ]) => ({
+                            date,
+                            total:
+                              Number(
+                                total.toFixed(
+                                  2
+                                )
+                              )
+                          })
+                        );
+                    })()}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar
+                      dataKey="total"
+                      name="Ventas USD"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 uppercase text-[10px] font-bold">
+                    <th className="p-3">
+                      ID
+                    </th>
+
+                    <th className="p-3">
+                      Fecha
+                    </th>
+
+                    <th className="p-3">
+                      Cliente
+                    </th>
+
+                    <th className="p-3">
+                      Método
+                    </th>
+
+                    <th className="p-3">
+                      Total USD
+                    </th>
+
+                    <th className="p-3">
+                      Total Bs.
+                    </th>
+
+                    <th className="p-3">
+                      Caja
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-slate-100">
+                  {salesHistory
+                    .filter(s => {
+                      if (
+                        reportFilterPeriod ===
+                        'all'
+                      )
+                        return true;
+
+                      const date =
+                        new Date(
+                          s.created_at ||
+                            s.date
+                        );
+
+                      const now =
+                        new Date();
+
+                      const diff =
+                        now.getTime() -
+                        date.getTime();
+
+                      if (
+                        reportFilterPeriod ===
+                        'today'
+                      ) {
+                        return (
+                          date.toDateString() ===
+                          now.toDateString()
+                        );
+                      }
+
+                      if (
+                        reportFilterPeriod ===
+                        'week'
+                      ) {
+                        return (
+                          diff <=
+                          7 *
+                            86400000
+                        );
+                      }
+
+                      return (
+                        diff <=
+                        30 *
+                          86400000
+                      );
+                    })
+                    .map(
+                      s => (
+                        <tr
+                          key={
+                            s.id
+                          }
+                          className="hover:bg-slate-50/70"
+                        >
+                          <td className="p-3 font-bold">
+                            #
+                            {s.id}
+                          </td>
+
+                          <td className="p-3 text-slate-500">
+                            {new Date(
+                              s.created_at ||
+                                s.date
+                            ).toLocaleString()}
+                          </td>
+
+                          <td className="p-3 font-semibold">
+                            {s.clientName ||
+                              'Cliente Genérico'}
+                          </td>
+
+                          <td className="p-3">
+                            {
+                              s.paymentMethod
+                            }
+                          </td>
+
+                          <td className="p-3 font-black">
+                            $
+                            {s.totalUSD.toFixed(
+                              2
+                            )}
+                          </td>
+
+                          <td className="p-3">
+                            Bs.{' '}
+                            {s.totalBs.toFixed(
+                              2
+                            )}
+                          </td>
+
+                          <td className="p-3">
+                            #
+                            {s.cashRegisterId ||
+                              '—'}
+                          </td>
+                        </tr>
+                      )
+                    )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ====================================================
+            CUENTAS / FINANZAS
+        ==================================================== */}
+
+        {activeTab ===
+          'accounts' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {userPermissions.includes(
+              'view_credits'
+            ) && (
+              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="text-lg font-extrabold">
+                      💳 Cuentas por Cobrar
+                    </h3>
+
+                    <p className="text-xs text-slate-500">
+                      Ventas a crédito /
+                      fiado.
+                    </p>
+                  </div>
+
+                  <span className="bg-amber-50 text-amber-700 border border-amber-100 rounded-xl px-3 py-1 text-xs font-bold">
+                    {
+                      credits.filter(
+                        c =>
+                          c.status ===
+                          'Pendiente'
+                      ).length
+                    }{' '}
+                    pendientes
+                  </span>
+                </div>
+
+                <div className="mt-4 space-y-2 max-h-[520px] overflow-y-auto">
+                  {credits.length ===
+                  0 ? (
+                    <div className="text-center py-10 text-slate-400 text-xs">
+                      No hay cuentas por cobrar.
+                    </div>
+                  ) : (
+                    credits.map(
+                      c => (
+                        <div
+                          key={c.id}
+                          className="border border-slate-200 rounded-2xl p-4 flex justify-between gap-3"
+                        >
+                          <div>
+                            <div className="font-bold text-sm">
+                              {
+                                c.clientName
+                              }
+                            </div>
+
+                            <div className="text-[10px] text-slate-500 mt-1">
+                              {
+                                c.clientDocument
+                              }{' '}
+                              ·{' '}
+                              {
+                                c.clientPhone
+                              }
+                            </div>
+
+                            <div className="text-[10px] text-slate-400 mt-1">
+                              Venta #
+                              {
+                                c.saleId
+                              }{' '}
+                              ·{' '}
+                              {c.date}
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <div className="font-black">
+                              $
+                              {c.totalDebtUSD.toFixed(
+                                2
+                              )}
+                            </div>
+
+                            <div className="text-[10px] text-slate-500">
+                              Bs.{' '}
+                              {c.totalDebtBs.toFixed(
+                                2
+                              )}
+                            </div>
+
+                            <span
+                              className={`inline-block mt-1 px-2 py-1 rounded-lg text-[9px] font-bold ${
+                                c.status ===
+                                'Pagado'
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : 'bg-amber-50 text-amber-700'
+                              }`}
+                            >
+                              {
+                                c.status
+                              }
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+
+            {userPermissions.includes(
+              'view_payables'
+            ) ||
+            userPermissions.includes(
+              'manage_payables'
+            ) ? (
+              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
+                <div className="border-b border-slate-100 pb-3">
+                  <h3 className="text-lg font-extrabold">
+                    📑 Cuentas por Pagar
+                  </h3>
+
+                  <p className="text-xs text-slate-500">
+                    Proveedores y obligaciones pendientes.
+                  </p>
+                </div>
+
+                <form
+                  onSubmit={
+                    handleAddPayable
+                  }
+                  className="mt-4 bg-slate-50/70 border border-slate-200 rounded-2xl p-4 space-y-2.5"
+                >
+                  <input
+                    value={
+                      newProviderName
+                    }
+                    onChange={e =>
+                      setNewProviderName(
+                        e.target
+                          .value
+                      )
+                    }
+                    placeholder="Proveedor *"
+                    required
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs"
+                  />
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      value={
+                        newProviderDoc
+                      }
+                      onChange={e =>
+                        setNewProviderDoc(
+                          e.target
+                            .value
+                        )
+                      }
+                      placeholder="RIF / Documento"
+                      className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs"
+                    />
+
+                    <input
+                      value={
+                        newPayableAmountUSD
+                      }
+                      onChange={e =>
+                        setNewPayableAmountUSD(
+                          e.target
+                            .value
+                        )
+                      }
+                      placeholder="Monto USD *"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      required
+                      className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs"
+                    />
+                  </div>
+
+                  <input
+                    value={
+                      newPayableDesc
+                    }
+                    onChange={e =>
+                      setNewPayableDesc(
+                        e.target
+                          .value
+                      )
+                    }
+                    placeholder="Descripción"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs"
+                  />
+
+                  <input
+                    value={
+                      newDueDate
+                    }
+                    onChange={e =>
+                      setNewDueDate(
+                        e.target
+                          .value
+                      )
+                    }
+                    type="date"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs"
+                  />
+
+                  <button className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-xl py-2.5 text-xs font-bold">
+                    Registrar Cuenta
+                  </button>
+                </form>
+
+                <div className="mt-4 space-y-2 max-h-[350px] overflow-y-auto">
+                  {payables.map(
+                    p => (
+                      <div
+                        key={p.id}
+                        className="border border-slate-200 rounded-2xl p-4 flex justify-between gap-3"
+                      >
+                        <div>
+                          <div className="font-bold text-sm">
+                            {
+                              p.providerName
+                            }
+                          </div>
+
+                          <div className="text-[10px] text-slate-500">
+                            {
+                              p.providerDocument
+                            }{' '}
+                            ·{' '}
+                            {
+                              p.description
+                            }
+                          </div>
+
+                          <div className="text-[10px] text-slate-400 mt-1">
+                            Vence:{' '}
+                            {
+                              p.dueDate
+                            }
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="font-black">
+                            $
+                            {p.totalDebtUSD.toFixed(
+                              2
+                            )}
+                          </div>
+
+                          <div className="text-[10px] text-slate-500">
+                            Bs.{' '}
+                            {p.totalDebtBs.toFixed(
+                              2
+                            )}
+                          </div>
+
+                          <span className="inline-block mt-1 bg-amber-50 text-amber-700 px-2 py-1 rounded-lg text-[9px] font-bold">
+                            {
+                              p.status
+                            }
+                          </span>
+                        </div>
                       </div>
-                    ))}
-                    <div className="border-b border-dashed border-black my-2" />
-                    <div className="flex justify-between"><span>Subtotal</span><b>${lastPrintedSale.subtotalUSD.toFixed(2)}</b></div>
-                    <div className="flex justify-between"><span>IVA</span><b>${lastPrintedSale.ivaUSD.toFixed(2)}</b></div>
-                    <div className="flex justify-between text-sm"><span>Total</span><b>${lastPrintedSale.totalUSD.toFixed(2)}</b></div>
-                    <div className="flex justify-between"><span>Bs.</span><b>{lastPrintedSale.totalBs.toFixed(2)}</b></div>
-                    <div className="mt-3 text-center">¡Gracias por su compra!</div>
+                    )
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {/* ====================================================
+            CLIENTES
+        ==================================================== */}
+
+        {activeTab ===
+          'customers' && (
+          <CustomersDirectoryModule />
+        )}
+
+        {/* ====================================================
+            ROLES
+        ==================================================== */}
+
+        {activeTab === 'roles' &&
+          userPermissions.includes(
+            'manage_roles'
+          ) && (
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
+              <RolesManagerModule />
+            </div>
+          )}
+      </main>
+
+      {/* ======================================================
+          MODAL ABRIR CAJA
+      ====================================================== */}
+
+      {showOpenCashModal && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">
+                  🔓 Abrir Caja
+                </h3>
+
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Usuario:{' '}
+                  {currentUserObj?.name ||
+                    authenticatedUser?.email ||
+                    '—'}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setShowOpenCashModal(
+                    false
+                  )
+                }
+                className="text-slate-400 hover:text-slate-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <form
+              onSubmit={
+                handleOpenCashSubmit
+              }
+              className="space-y-4 pt-5"
+            >
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  Monto inicial USD
+                </label>
+
+                <input
+                  value={
+                    openingUSD
+                  }
+                  onChange={e =>
+                    setOpeningUSD(
+                      e.target
+                        .value
+                    )
+                  }
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  Monto inicial Bs.
+                </label>
+
+                <input
+                  value={
+                    openingBs
+                  }
+                  onChange={e =>
+                    setOpeningBs(
+                      e.target
+                        .value
+                    )
+                  }
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-2xl"
+              >
+                Abrir Caja
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================
+          MODAL CERRAR CAJA
+      ====================================================== */}
+
+      {showCloseCashModal && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">
+                  🔒 Arqueo / Cerrar Caja
+                </h3>
+
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Caja #
+                  {activeRegisterId ||
+                    '—'}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setShowCloseCashModal(
+                    false
+                  )
+                }
+                className="text-slate-400 hover:text-slate-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="pt-5 space-y-4">
+              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-xs text-blue-900">
+                El cierre se realizará sobre la caja abierta en la base de datos para este usuario.
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  Efectivo contado USD
+                </label>
+
+                <input
+                  value={
+                    countedUSD
+                  }
+                  onChange={e =>
+                    setCountedUSD(
+                      e.target
+                        .value
+                    )
+                  }
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  Efectivo contado Bs.
+                </label>
+
+                <input
+                  value={
+                    countedBs
+                  }
+                  onChange={e =>
+                    setCountedBs(
+                      e.target
+                        .value
+                    )
+                  }
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={
+                  handleCloseCashSubmit
+                }
+                className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-2xl"
+              >
+                Cerrar y Arquear Caja
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================
+          MODAL CHECKOUT
+      ====================================================== */}
+
+      {isCheckoutModalOpen && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl p-6 my-8">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-lg font-black">
+                  💳{' '}
+                  {loadedWebOrder
+                    ? 'Facturar Pedido Web'
+                    : 'Confirmar Venta'}
+                </h3>
+
+                <p className="text-[10px] text-slate-500">
+                  Caja #
+                  {activeRegisterId ||
+                    '—'}{' '}
+                  ·{' '}
+                  {
+                    currentUserObj?.name ||
+                    'Usuario'
+                  }
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setIsCheckoutModalOpen(
+                    false
+                  )
+                }
+                className="text-slate-400 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <form
+              onSubmit={
+                handleCheckout
+              }
+              className="space-y-4 pt-5"
+            >
+              {loadedWebOrder ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+                  <div className="text-[10px] font-bold text-emerald-600 uppercase">
+                    Pedido Web
+                  </div>
+
+                  <div className="text-lg font-black text-emerald-900">
+                    #
+                    {
+                      loadedWebOrder.id
+                    }
+                  </div>
+
+                  <div className="text-xs text-emerald-800 mt-1">
+                    {
+                      loadedWebOrder.customer_name
+                    }
+                  </div>
+
+                  {loadedWebOrder.customer_phone && (
+                    <div className="text-[10px] text-emerald-700 mt-1">
+                      Tel:{' '}
+                      {
+                        loadedWebOrder.customer_phone
+                      }
+                    </div>
+                  )}
+
+                  {loadedWebOrder.order_type && (
+                    <div className="text-[10px] text-emerald-700 mt-1">
+                      Servicio:{' '}
+                      {
+                        loadedWebOrder.order_type
+                      }
+                      {loadedWebOrder.delivery_zone
+                        ? ` · ${loadedWebOrder.delivery_zone}`
+                        : ''}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <POSCustomerSelector
+                  onSelectCustomer={c => {
+                    setClientName(
+                      c.name
+                    );
+
+                    setClientDocument(
+                      c.document
+                    );
+
+                    setClientPhone(
+                      c.phone
+                    );
+                  }}
+                />
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">
+                    Método de pago
+                  </label>
+
+                  <select
+                    value={
+                      paymentMethod
+                    }
+                    onChange={e =>
+                      setPaymentMethod(
+                        e.target
+                          .value as PaymentMethodType
+                      )
+                    }
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-3 text-xs font-bold"
+                  >
+                    <option>
+                      Efectivo USD
+                    </option>
+
+                    <option>
+                      Efectivo Bs
+                    </option>
+
+                    <option>
+                      Pago Móvil
+                    </option>
+
+                    <option>
+                      Zelle
+                    </option>
+
+                    <option>
+                      Binance Pay
+                    </option>
+
+                    <option>
+                      Crédito / Fiado
+                    </option>
+                  </select>
+                </div>
+
+                {paymentMethod ===
+                  'Efectivo USD' && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">
+                      Efectivo recibido USD
+                    </label>
+
+                    <input
+                      value={
+                        cashGivenUSD
+                      }
+                      onChange={e =>
+                        setCashGivenUSD(
+                          e.target
+                            .value
+                        )
+                      }
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      required
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-3 text-xs"
+                      placeholder="0.00"
+                    />
                   </div>
                 )}
               </div>
-            </div>
-          )}
+
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+                {loadedWebOrder && (
+                  <div className="flex justify-between text-xs text-emerald-700 font-bold">
+                    <span>
+                      Pedido Web
+                    </span>
+
+                    <span>
+                      #
+                      {
+                        loadedWebOrder.id
+                      }
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex justify-between text-xs">
+                  <span>
+                    Subtotal
+                  </span>
+
+                  <b>
+                    $
+                    {subtotalUSD.toFixed(
+                      2
+                    )}
+                  </b>
+                </div>
+
+                <div className="flex justify-between text-xs">
+                  <span>
+                    IVA
+                  </span>
+
+                  <b>
+                    $
+                    {ivaUSD.toFixed(
+                      2
+                    )}
+                  </b>
+                </div>
+
+                {loadedWebOrder &&
+                  loadedWebOrder.order_type ===
+                    'Delivery' && (
+                    <div className="flex justify-between text-xs">
+                      <span>
+                        Delivery (
+                        {
+                          loadedWebOrder.delivery_zone
+                        })
+                      </span>
+
+                      <b>
+                        $
+                        {(
+                          totalUSD -
+                          subtotalUSD
+                        ).toFixed(
+                          2
+                        )}
+                      </b>
+                    </div>
+                  )}
+
+                <div className="flex justify-between text-base font-black border-t pt-2">
+                  <span>
+                    Total USD
+                  </span>
+
+                  <b>
+                    $
+                    {totalUSD.toFixed(
+                      2
+                    )}
+                  </b>
+                </div>
+
+                <div className="flex justify-between text-xs font-bold text-blue-600">
+                  <span>
+                    Total Bs.
+                  </span>
+
+                  <b>
+                    Bs.{' '}
+                    {totalBs.toFixed(
+                      2
+                    )}
+                  </b>
+                </div>
+
+                {paymentMethod ===
+                  'Efectivo USD' &&
+                  Number(
+                    cashGivenUSD ||
+                      0
+                  ) >=
+                    totalUSD && (
+                    <div className="flex justify-between text-xs text-emerald-700 font-bold border-t pt-2">
+                      <span>
+                        Cambio
+                      </span>
+
+                      <b>
+                        $
+                        {(
+                          Number(
+                            cashGivenUSD ||
+                              0
+                          ) -
+                          totalUSD
+                        ).toFixed(
+                          2
+                        )}
+                      </b>
+                    </div>
+                  )}
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-2xl shadow-md"
+              >
+                {loadedWebOrder
+                  ? 'Confirmar y Facturar Pedido Web'
+                  : 'Confirmar y Registrar Venta'}
+              </button>
+            </form>
+          </div>
         </div>
-      );
-    }
+      )}
+
+      {/* ======================================================
+          MODAL REPOSICIÓN
+      ====================================================== */}
+
+      {isRestockModalOpen &&
+        selectedProductForRestock && (
+          <div className="fixed inset-0 z-[100] bg-slate-950/60 flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                <h3 className="font-black">
+                  📦 Reabastecer Producto
+                </h3>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setIsRestockModalOpen(
+                      false
+                    )
+                  }
+                  className="text-slate-400 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              <form
+                onSubmit={
+                  handleRestock
+                }
+                className="pt-5 space-y-4"
+              >
+                <div className="bg-slate-50 rounded-2xl p-4">
+                  <div className="font-bold text-sm">
+                    {
+                      selectedProductForRestock.name
+                    }
+                  </div>
+
+                  <div className="text-xs text-slate-500 mt-1">
+                    Stock actual:{' '}
+                    {
+                      selectedProductForRestock.stock
+                    }
+                  </div>
+                </div>
+
+                <input
+                  autoFocus
+                  required
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={
+                    restockAmount
+                  }
+                  onChange={e =>
+                    setRestockAmount(
+                      e.target
+                        .value
+                    )
+                  }
+                  placeholder="Cantidad a agregar"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm"
+                />
+
+                <button
+                  type="submit"
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl py-3 font-bold"
+                >
+                  Reabastecer
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+      {/* ======================================================
+          MODAL EDITAR PRODUCTO
+      ====================================================== */}
+
+      {isEditModalOpen &&
+        editingProduct && (
+          <div className="fixed inset-0 z-[100] bg-slate-950/60 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-6 my-6">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                <h3 className="font-black">
+                  ✏️ Editar Producto
+                </h3>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setIsEditModalOpen(
+                      false
+                    )
+                  }
+                  className="text-slate-400 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              <form
+                onSubmit={
+                  handleUpdateProduct
+                }
+                className="pt-5 space-y-3"
+              >
+                <input
+                  required
+                  value={
+                    editName
+                  }
+                  onChange={e =>
+                    setEditName(
+                      e.target
+                        .value
+                    )
+                  }
+                  placeholder="Nombre"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs"
+                />
+
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    required
+                    type="number"
+                    step="0.01"
+                    value={
+                      editPrice
+                    }
+                    onChange={e =>
+                      setEditPrice(
+                        e.target
+                          .value
+                      )
+                    }
+                    placeholder="Precio venta"
+                    className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs"
+                  />
+
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={
+                      editCostPrice
+                    }
+                    onChange={e =>
+                      setEditCostPrice(
+                        e.target
+                          .value
+                      )
+                    }
+                    placeholder="Costo"
+                    className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs"
+                  />
+                </div>
+
+                <input
+                  required
+                  type="number"
+                  min="0"
+                  value={
+                    editStock
+                  }
+                  onChange={e =>
+                    setEditStock(
+                      e.target
+                        .value
+                    )
+                  }
+                  placeholder="Stock"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs"
+                />
+
+                <select
+                  value={
+                    editCategory
+                  }
+                  onChange={e =>
+                    setEditCategory(
+                      e.target
+                        .value
+                    )
+                  }
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold"
+                >
+                  {categoriesList.map(
+                    cat => (
+                      <option
+                        key={cat}
+                        value={cat}
+                      >
+                        {cat}
+                      </option>
+                    )
+                  )}
+                </select>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    Descripción del plato
+                  </label>
+
+                  <textarea
+                    value={
+                      editDescription
+                    }
+                    onChange={e =>
+                      setEditDescription(
+                        e.target
+                          .value
+                      )
+                    }
+                    maxLength={500}
+                    rows={3}
+                    placeholder="Describe brevemente el plato..."
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    Imagen
+                  </label>
+
+                  {editImage ? (
+                    <img
+                      src={
+                        editImage
+                      }
+                      alt="Vista previa"
+                      className="w-full h-32 object-cover rounded-2xl border"
+                    />
+                  ) : null}
+
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={e =>
+                      handleImageUploadToImgBB(
+                        e,
+                        true
+                      )
+                    }
+                    className="w-full mt-2 text-xs"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-2xl py-3 font-bold"
+                >
+                  Guardar Cambios
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+      {/* ======================================================
+          MODAL VENTA EXITOSA / TICKET
+      ====================================================== */}
+
+      {successModalData?.isOpen && (
+        <div className="fixed inset-0 z-[110] bg-slate-950/70 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 my-6">
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-3xl mx-auto">
+                ✓
+              </div>
+
+              <h3 className="text-xl font-black mt-4">
+                {lastPrintedSale &&
+                !loadedWebOrder
+                  ? '¡Venta registrada!'
+                  : '¡Venta registrada!'}
+              </h3>
+
+              <p className="text-xs text-slate-500 mt-1">
+                {successModalData.clientName ||
+                  'Cliente Genérico'}
+              </p>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-4 mt-5 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span>
+                  Total
+                </span>
+
+                <b>
+                  $
+                  {lastPrintedSale?.totalUSD?.toFixed(
+                    2
+                  ) ||
+                    totalUSD.toFixed(
+                      2
+                    )}
+                </b>
+              </div>
+
+              {successModalData.changeUSD >
+                0 && (
+                <div className="flex justify-between text-emerald-700">
+                  <span>
+                    Cambio USD
+                  </span>
+
+                  <b>
+                    $
+                    {successModalData.changeUSD.toFixed(
+                      2
+                    )}
+                  </b>
+                </div>
+              )}
+
+              {successModalData.changeBs >
+                0 && (
+                <div className="flex justify-between text-emerald-700">
+                  <span>
+                    Cambio Bs.
+                  </span>
+
+                  <b>
+                    Bs.{' '}
+                    {successModalData.changeBs.toFixed(
+                      2
+                    )}
+                  </b>
+                </div>
+              )}
+
+              <div className="flex justify-between">
+                <span>
+                  Método
+                </span>
+
+                <b>
+                  {lastPrintedSale?.paymentMethod ||
+                    paymentMethod}
+                </b>
+              </div>
+
+              <div className="flex justify-between">
+                <span>
+                  Caja
+                </span>
+
+                <b>
+                  #
+                  {lastPrintedSale?.cashRegisterId ||
+                    activeRegisterId ||
+                    '—'}
+                </b>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-2">
+              <button
+                type="button"
+                onClick={() =>
+                  window.print()
+                }
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-2xl py-3 font-bold"
+              >
+                🖨️ Imprimir Ticket
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSuccessModalData(
+                    null
+                  );
+
+                  setLastPrintedSale(
+                    null
+                  );
+                }}
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-2xl py-3 font-bold"
+              >
+                Listo
+              </button>
+            </div>
+
+            {lastPrintedSale && (
+              <div className="hidden print:block print-ticket mt-4 text-black text-xs">
+                <div className="text-center font-black text-base">
+                  POS ENTERPRISE
+                </div>
+
+                <div className="text-center">
+                  Comprobante de Venta
+                </div>
+
+                <div className="border-b border-dashed border-black my-2" />
+
+                <div>
+                  Venta: #
+                  {
+                    lastPrintedSale.id
+                  }
+                </div>
+
+                <div>
+                  Fecha:{' '}
+                  {
+                    lastPrintedSale.date
+                  }
+                </div>
+
+                <div>
+                  Cliente:{' '}
+                  {lastPrintedSale.clientName ||
+                    'Cliente Genérico'}
+                </div>
+
+                <div>
+                  Caja: #
+                  {lastPrintedSale.cashRegisterId ||
+                    '—'}
+                </div>
+
+                <div className="border-b border-dashed border-black my-2" />
+
+                {lastPrintedSale.items.map(
+                  (
+                    item: CartItem
+                  ) => (
+                    <div
+                      key={
+                        item.id
+                      }
+                      className="flex justify-between gap-2"
+                    >
+                      <span>
+                        {item.quantity}{' '}
+                        x{' '}
+                        {
+                          item.name
+                        }
+                      </span>
+
+                      <span>
+                        $
+                        {(
+                          item.quantity *
+                          item.price
+                        ).toFixed(
+                          2
+                        )}
+                      </span>
+                    </div>
+                  )
+                )}
+
+                <div className="border-b border-dashed border-black my-2" />
+
+                <div className="flex justify-between">
+                  <span>
+                    Subtotal
+                  </span>
+
+                  <b>
+                    $
+                    {lastPrintedSale.subtotalUSD.toFixed(
+                      2
+                    )}
+                  </b>
+                </div>
+
+                <div className="flex justify-between">
+                  <span>
+                    IVA
+                  </span>
+
+                  <b>
+                    $
+                    {lastPrintedSale.ivaUSD.toFixed(
+                      2
+                    )}
+                  </b>
+                </div>
+
+                <div className="flex justify-between text-sm">
+                  <span>
+                    Total
+                  </span>
+
+                  <b>
+                    $
+                    {lastPrintedSale.totalUSD.toFixed(
+                      2
+                    )}
+                  </b>
+                </div>
+
+                <div className="flex justify-between">
+                  <span>
+                    Bs.
+                  </span>
+
+                  <b>
+                    {lastPrintedSale.totalBs.toFixed(
+                      2
+                    )}
+                  </b>
+                </div>
+
+                <div className="mt-3 text-center">
+                  ¡Gracias por su compra!
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
