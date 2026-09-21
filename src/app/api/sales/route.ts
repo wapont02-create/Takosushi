@@ -1,256 +1,527 @@
 import { NextResponse } from 'next/server';
 import { runQuery } from '@/db/client';
 
+export const dynamic = 'force-dynamic';
+
+// ============================================================
+// UTILIDADES
+// ============================================================
+
+function extractRows(result: any): any[] {
+  if (Array.isArray(result)) {
+    return result;
+  }
+
+  if (result?.rows && Array.isArray(result.rows)) {
+    return result.rows;
+  }
+
+  return [];
+}
+
+async function findOrCreateCustomer(
+  db: any,
+  customerName: string,
+  customerPhone: string,
+  customerDocument: string
+): Promise<number | null> {
+  const name = String(customerName || '').trim();
+  const phone = String(customerPhone || '').trim();
+  const document = String(customerDocument || '').trim();
+
+  if (!name) {
+    return null;
+  }
+
+  // ----------------------------------------------------------
+  // Buscar por teléfono
+  // ----------------------------------------------------------
+  if (phone) {
+    const byPhone = extractRows(
+      await db.sql(
+        `
+        SELECT id
+        FROM customers
+        WHERE phone = ?
+        LIMIT 1
+        `,
+        [phone]
+      )
+    );
+
+    if (byPhone.length > 0) {
+      return Number(byPhone[0].id);
+    }
+  }
+
+  // ----------------------------------------------------------
+  // Buscar por documento
+  // ----------------------------------------------------------
+  if (document) {
+    const byDocument = extractRows(
+      await db.sql(
+        `
+        SELECT id
+        FROM customers
+        WHERE rif_ci = ?
+        LIMIT 1
+        `,
+        [document]
+      )
+    );
+
+    if (byDocument.length > 0) {
+      return Number(byDocument[0].id);
+    }
+  }
+
+  // ----------------------------------------------------------
+  // Buscar por nombre
+  // ----------------------------------------------------------
+  const byName = extractRows(
+    await db.sql(
+      `
+      SELECT id
+      FROM customers
+      WHERE name = ?
+      LIMIT 1
+      `,
+      [name]
+    )
+  );
+
+  if (byName.length > 0) {
+    return Number(byName[0].id);
+  }
+
+  // ----------------------------------------------------------
+  // Crear cliente
+  // ----------------------------------------------------------
+  const created = extractRows(
+    await db.sql(
+      `
+      INSERT INTO customers (
+        name,
+        rif_ci,
+        phone
+      )
+      VALUES (?, ?, ?)
+      RETURNING id
+      `,
+      [
+        name,
+        document || null,
+        phone || null,
+      ]
+    )
+  );
+
+  if (created.length === 0) {
+    throw new Error('No se pudo crear el cliente.');
+  }
+
+  return Number(created[0].id);
+}
+
+// ============================================================
+// POST /api/sales
+// ============================================================
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
     const {
-      date,
-      created_at,
-      totalUSD,
+      items,
+      total,
       totalBs,
       exchangeRate,
       paymentMethod,
-      items,
+      userId,
       cashRegisterId,
       cash_register_id,
-      userId
+      customerName,
+      customerPhone,
+      customerDocument,
+      webOrderId,
     } = body;
 
-    // ============================================================
-    // 1. VALIDAR CAJA
-    // ============================================================
-
-    const registerIdRaw = cashRegisterId ?? cash_register_id;
-    const registerId = Number(registerIdRaw);
-
-    if (!Number.isInteger(registerId) || registerId <= 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'No se recibió una caja válida para registrar la venta.'
-        },
-        { status: 400 }
-      );
-    }
-
-    // ============================================================
-    // 2. VALIDAR USUARIO
-    // ============================================================
-
     const parsedUserId = Number(userId);
+
+    const parsedCashRegisterId = Number(
+      cashRegisterId ?? cash_register_id
+    );
+
+    // ========================================================
+    // VALIDAR USUARIO
+    // ========================================================
 
     if (!Number.isInteger(parsedUserId) || parsedUserId <= 0) {
       return NextResponse.json(
         {
           success: false,
-          error: 'No se recibió un usuario válido para registrar la venta.'
+          message: 'Usuario no válido.',
         },
         { status: 400 }
       );
     }
 
-    // ============================================================
-    // 3. VERIFICAR CAJA ABIERTA Y DEL USUARIO
-    // ============================================================
+    // ========================================================
+    // VALIDAR CAJA
+    // ========================================================
 
-    const registerResult: any = await runQuery(async (db) => {
-      return await db.sql(
-        `
-        SELECT
-          cr.id,
-          cr.user_id,
-          cr.status,
-          cr.opening_date,
-          cr.closing_date
-        FROM cash_registers cr
-        WHERE cr.id = ?
-          AND cr.user_id = ?
-          AND cr.status = 'open'
-          AND cr.closing_date IS NULL
-        LIMIT 1
-        `,
-        registerId,
-        parsedUserId
-      );
-    });
-
-    const registerRows = Array.isArray(registerResult)
-      ? registerResult
-      : registerResult?.rows || [];
-
-    if (registerRows.length === 0) {
+    if (
+      !Number.isInteger(parsedCashRegisterId) ||
+      parsedCashRegisterId <= 0
+    ) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            'La caja seleccionada no está abierta, fue cerrada o no pertenece al usuario actual.'
+          message: 'No se recibió una caja válida.',
         },
         { status: 400 }
       );
     }
 
-    const activeRegister = registerRows[0];
-    const activeRegisterId = Number(activeRegister.id);
-
-    if (!Number.isInteger(activeRegisterId) || activeRegisterId <= 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'La caja abierta no tiene un ID válido.'
-        },
-        { status: 400 }
-      );
-    }
-
-    // ============================================================
-    // 4. VALORES SEGUROS
-    // ============================================================
-
-    const safeTotalUSD = Number(totalUSD) || 0;
-    const safeTotalBs = Number(totalBs) || 0;
-    const safeExchangeRate = Number(exchangeRate) || 1;
-    const safePaymentMethod = paymentMethod || 'Efectivo USD';
-    const safeDate =
-      date || created_at || new Date().toISOString();
-
-    if (safeTotalUSD <= 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'El total de la venta debe ser mayor que cero.'
-        },
-        { status: 400 }
-      );
-    }
+    // ========================================================
+    // VALIDAR CARRITO
+    // ========================================================
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
         {
           success: false,
-          error: 'La venta debe contener al menos un producto.'
+          message: 'La venta debe contener al menos un producto.',
         },
         { status: 400 }
       );
     }
 
-    // ============================================================
-    // 5. INSERTAR VENTA Y OBTENER ID REAL
-    // ============================================================
+    // ========================================================
+    // PROCESAR DENTRO DE SQLite Cloud
+    // ========================================================
 
-    const saleResult: any = await runQuery(async (db) => {
-      return await db.sql(
-        `
-        INSERT INTO sales (
-          total_usd,
-          payment_method,
-          cash_register_id,
-          total_ves,
-          exchange_rate,
-          created_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?)
-        RETURNING id
-        `,
-        safeTotalUSD,
-        safePaymentMethod,
-        activeRegisterId,
-        safeTotalBs,
-        safeExchangeRate,
-        safeDate
-      );
-    });
+    const result = await runQuery(async (db) => {
+      // ======================================================
+      // 1. VERIFICAR CAJA ABIERTA
+      // ======================================================
 
-    const saleRows = Array.isArray(saleResult)
-      ? saleResult
-      : saleResult?.rows || [];
-
-    const saleId = Number(saleRows[0]?.id);
-
-    if (!Number.isInteger(saleId) || saleId <= 0) {
-      console.error(
-        'Respuesta inesperada al crear venta:',
-        saleResult
-      );
-
-      throw new Error(
-        'La venta fue creada, pero no se pudo obtener su ID.'
-      );
-    }
-
-    // ============================================================
-    // 6. INSERTAR PRODUCTOS DE LA VENTA
-    //    Y DESCONTAR STOCK UNA SOLA VEZ
-    // ============================================================
-
-    for (const item of items) {
-      const productId = Number(item.id || item.product_id);
-      const quantity = Number(item.quantity);
-      const price = Number(item.price || item.price_usd);
-
-      if (!Number.isInteger(productId) || productId <= 0) {
-        throw new Error(
-          'La venta contiene un producto inválido.'
-        );
-      }
-
-      if (!Number.isInteger(quantity) || quantity <= 0) {
-        throw new Error(
-          `Cantidad inválida para el producto ${productId}.`
-        );
-      }
-
-      if (!Number.isFinite(price) || price < 0) {
-        throw new Error(
-          `Precio inválido para el producto ${productId}.`
-        );
-      }
-
-      // ----------------------------------------------------------
-      // Verificar stock antes de descontar
-      // ----------------------------------------------------------
-
-      const productResult: any = await runQuery(async (db) => {
-        return await db.sql(
+      const cashRows = extractRows(
+        await db.sql(
           `
           SELECT
             id,
-            name,
-            stock
-          FROM products
+            user_id,
+            status,
+            closing_date
+          FROM cash_registers
           WHERE id = ?
           LIMIT 1
           `,
-          productId
-        );
-      });
+          [parsedCashRegisterId]
+        )
+      );
 
-      const productRows = Array.isArray(productResult)
-        ? productResult
-        : productResult?.rows || [];
+      if (cashRows.length === 0) {
+        throw new Error('La caja indicada no existe.');
+      }
 
-      if (productRows.length === 0) {
+      const cashRegister = cashRows[0];
+
+      if (String(cashRegister.status) !== 'open') {
+        throw new Error('La caja no está abierta.');
+      }
+
+      if (cashRegister.closing_date !== null) {
+        throw new Error('La caja ya fue cerrada.');
+      }
+
+      if (Number(cashRegister.user_id) !== parsedUserId) {
         throw new Error(
-          `El producto con ID ${productId} no existe.`
+          'La caja abierta no pertenece al usuario actual.'
         );
       }
 
-      const product = productRows[0];
-      const currentStock = Number(product.stock) || 0;
+      // ======================================================
+      // 2. PEDIDO WEB
+      // ======================================================
 
-      if (currentStock < quantity) {
+      const parsedWebOrderId = Number(webOrderId);
+
+      if (
+        Number.isInteger(parsedWebOrderId) &&
+        parsedWebOrderId > 0
+      ) {
+        // ----------------------------------------------------
+        // Buscar pedido web aprobado
+        // ----------------------------------------------------
+
+        const webOrderRows = extractRows(
+          await db.sql(
+            `
+            SELECT
+              id,
+              customer_id,
+              total_usd,
+              total_ves,
+              exchange_rate,
+              status,
+              source,
+              cash_register_id,
+              payment_method
+            FROM sales
+            WHERE
+              id = ?
+              AND source = 'web'
+              AND status = 'aprobado'
+              AND cash_register_id IS NULL
+            LIMIT 1
+            `,
+            [parsedWebOrderId]
+          )
+        );
+
+        if (webOrderRows.length === 0) {
+          throw new Error(
+            'El pedido web no existe, no está aprobado o ya fue facturado.'
+          );
+        }
+
+        const webOrder = webOrderRows[0];
+
+        // ----------------------------------------------------
+        // Cargar los productos originales del pedido
+        // ----------------------------------------------------
+
+        const webItems = extractRows(
+          await db.sql(
+            `
+            SELECT
+              si.product_id,
+              si.quantity,
+              si.price_at_sale,
+              p.name,
+              p.stock
+            FROM sale_items si
+            INNER JOIN products p
+              ON p.id = si.product_id
+            WHERE si.sale_id = ?
+            ORDER BY si.id ASC
+            `,
+            [parsedWebOrderId]
+          )
+        );
+
+        if (webItems.length === 0) {
+          throw new Error(
+            'El pedido web no tiene productos asociados.'
+          );
+        }
+
+        // ----------------------------------------------------
+        // Validar existencia y stock ANTES de modificar nada
+        // ----------------------------------------------------
+
+        for (const item of webItems) {
+          const quantity = Number(item.quantity);
+          const stock = Number(item.stock);
+
+          if (!Number.isFinite(quantity) || quantity <= 0) {
+            throw new Error(
+              `Cantidad inválida para el producto "${item.name}".`
+            );
+          }
+
+          if (stock < quantity) {
+            throw new Error(
+              `Stock insuficiente para "${item.name}". Disponible: ${stock}.`
+            );
+          }
+        }
+
+        // ----------------------------------------------------
+        // Actualizar la venta existente
+        // NO se crea otra venta
+        // ----------------------------------------------------
+
+        await db.sql(
+          `
+          UPDATE sales
+          SET
+            payment_method = ?,
+            cash_register_id = ?,
+            status = 'completada'
+          WHERE
+            id = ?
+            AND source = 'web'
+            AND status = 'aprobado'
+            AND cash_register_id IS NULL
+          `,
+          [
+            String(paymentMethod || webOrder.payment_method || ''),
+            parsedCashRegisterId,
+            parsedWebOrderId,
+          ]
+        );
+
+        // ----------------------------------------------------
+        // Descontar inventario una sola vez
+        // ----------------------------------------------------
+
+        for (const item of webItems) {
+          await db.sql(
+            `
+            UPDATE products
+            SET stock = stock - ?
+            WHERE id = ?
+            `,
+            [
+              Number(item.quantity),
+              Number(item.product_id),
+            ]
+          );
+        }
+
+        return {
+          saleId: parsedWebOrderId,
+          webOrderId: parsedWebOrderId,
+          source: 'web',
+          status: 'completada',
+          totalUSD: Number(webOrder.total_usd) || 0,
+          totalBs: Number(webOrder.total_ves) || 0,
+          exchangeRate:
+            Number(webOrder.exchange_rate) || 0,
+          paymentMethod:
+            String(paymentMethod || webOrder.payment_method || ''),
+        };
+      }
+
+      // ======================================================
+      // 3. VENTA NORMAL DEL POS
+      // ======================================================
+
+      const normalizedItems = items.map((item: any) => ({
+        productId: Number(item.id ?? item.product_id),
+        quantity: Number(item.quantity),
+        price: Number(item.price),
+        taxable: Boolean(item.taxable),
+      }));
+
+      const invalidItem = normalizedItems.find(
+        (item) =>
+          !Number.isInteger(item.productId) ||
+          item.productId <= 0 ||
+          !Number.isFinite(item.quantity) ||
+          item.quantity <= 0 ||
+          !Number.isFinite(item.price) ||
+          item.price < 0
+      );
+
+      if (invalidItem) {
         throw new Error(
-          `Stock insuficiente para "${product.name}". Disponible: ${currentStock}.`
+          'Uno o más productos de la venta no son válidos.'
         );
       }
 
-      // ----------------------------------------------------------
-      // Registrar detalle de venta
-      // ----------------------------------------------------------
+      // ------------------------------------------------------
+      // Validar stock de todos los productos
+      // ------------------------------------------------------
 
-      await runQuery(async (db) => {
-        return await db.sql(
+      for (const item of normalizedItems) {
+        const productRows = extractRows(
+          await db.sql(
+            `
+            SELECT
+              id,
+              name,
+              stock
+            FROM products
+            WHERE id = ?
+            LIMIT 1
+            `,
+            [item.productId]
+          )
+        );
+
+        if (productRows.length === 0) {
+          throw new Error(
+            `El producto con ID ${item.productId} no existe.`
+          );
+        }
+
+        const product = productRows[0];
+        const stock = Number(product.stock);
+
+        if (stock < item.quantity) {
+          throw new Error(
+            `Stock insuficiente para "${product.name}". Disponible: ${stock}.`
+          );
+        }
+      }
+
+      // ------------------------------------------------------
+      // Buscar o crear cliente
+      // ------------------------------------------------------
+
+      let customerId: number | null = null;
+
+      const hasCustomer =
+        String(customerName || '').trim() !== '';
+
+      if (hasCustomer) {
+        customerId = await findOrCreateCustomer(
+          db,
+          String(customerName || ''),
+          String(customerPhone || ''),
+          String(customerDocument || '')
+        );
+      }
+
+      // ------------------------------------------------------
+      // Crear venta normal POS
+      // ------------------------------------------------------
+
+      const saleRows = extractRows(
+        await db.sql(
+          `
+          INSERT INTO sales (
+            customer_id,
+            total_usd,
+            payment_method,
+            created_at,
+            cash_register_id,
+            total_ves,
+            exchange_rate,
+            status,
+            source
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'completada', 'pos')
+          RETURNING id
+          `,
+          [
+            customerId,
+            Number(total) || 0,
+            String(paymentMethod || ''),
+            new Date().toISOString(),
+            parsedCashRegisterId,
+            Number(totalBs) || 0,
+            Number(exchangeRate) || 0,
+          ]
+        )
+      );
+
+      if (saleRows.length === 0) {
+        throw new Error('No se pudo crear la venta.');
+      }
+
+      const directSaleId = Number(saleRows[0].id);
+
+      // ------------------------------------------------------
+      // Crear detalle de venta
+      // ------------------------------------------------------
+
+      for (const item of normalizedItems) {
+        await db.sql(
           `
           INSERT INTO sale_items (
             sale_id,
@@ -260,82 +531,139 @@ export async function POST(request: Request) {
           )
           VALUES (?, ?, ?, ?)
           `,
-          saleId,
-          productId,
-          quantity,
-          price
+          [
+            directSaleId,
+            item.productId,
+            item.quantity,
+            item.price,
+          ]
         );
-      });
+      }
 
-      // ----------------------------------------------------------
-      // Descontar stock
-      // ----------------------------------------------------------
+      // ------------------------------------------------------
+      // Descontar inventario
+      // ------------------------------------------------------
 
-      await runQuery(async (db) => {
-        return await db.sql(
+      for (const item of normalizedItems) {
+        await db.sql(
           `
           UPDATE products
           SET stock = stock - ?
           WHERE id = ?
           `,
-          quantity,
-          productId
+          [
+            item.quantity,
+            item.productId,
+          ]
         );
-      });
-    }
+      }
 
-    // ============================================================
-    // 7. RESPUESTA FINAL
-    // ============================================================
+      return {
+        saleId: directSaleId,
+        webOrderId: null,
+        source: 'pos',
+        status: 'completada',
+        totalUSD: Number(total) || 0,
+        totalBs: Number(totalBs) || 0,
+        exchangeRate: Number(exchangeRate) || 0,
+        paymentMethod: String(paymentMethod || ''),
+      };
+    });
+
+    // ========================================================
+    // RESPUESTA
+    // ========================================================
 
     return NextResponse.json({
       success: true,
-      saleId,
-      cashRegisterId: activeRegisterId,
-      userId: parsedUserId,
-      message: 'Venta registrada con éxito'
+      saleId: result.saleId,
+      webOrderId: result.webOrderId,
+      source: result.source,
+      status: result.status,
+      totalUSD: result.totalUSD,
+      totalBs: result.totalBs,
+      exchangeRate: result.exchangeRate,
+      paymentMethod: result.paymentMethod,
+      message:
+        result.source === 'web'
+          ? 'Pedido web facturado correctamente.'
+          : 'Venta registrada correctamente.',
     });
-
-  } catch (error: any) {
-    console.error('Error al registrar venta:', error);
+  } catch (error) {
+    console.error('POST /api/sales error:', error);
 
     return NextResponse.json(
       {
         success: false,
-        error:
-          error?.message ||
-          'Error al procesar la venta en la base de datos'
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Error interno al procesar la venta.',
       },
       { status: 500 }
     );
   }
 }
 
+// ============================================================
+// GET /api/sales
+// Historial de ventas del POS
+// ============================================================
+
 export async function GET() {
   try {
-    const result: any = await runQuery(async (db) => {
+    const result = await runQuery(async (db) => {
       return await db.sql(
         `
-        SELECT *
-        FROM sales
-        ORDER BY id DESC
+        SELECT
+          s.id,
+          s.customer_id,
+          s.total_usd,
+          s.total_ves,
+          s.exchange_rate,
+          s.payment_method,
+          s.created_at,
+          s.cash_register_id,
+          s.status,
+          s.source,
+
+          c.name AS customer_name,
+          c.rif_ci AS customer_document,
+          c.phone AS customer_phone
+
+        FROM sales s
+
+        LEFT JOIN customers c
+          ON c.id = s.customer_id
+
+        WHERE
+          s.source = 'pos'
+          OR (
+            s.source = 'web'
+            AND s.status = 'completada'
+          )
+
+        ORDER BY
+          s.id DESC
         `
       );
     });
 
-    const rows = Array.isArray(result)
-      ? result
-      : result?.rows || [];
-
-    return NextResponse.json(rows);
-
+    return NextResponse.json({
+      success: true,
+      sales: extractRows(result),
+    });
   } catch (error) {
-    console.error('Error obteniendo ventas:', error);
+    console.error('GET /api/sales error:', error);
 
     return NextResponse.json(
       {
         success: false,
-        error: 'Error al obtener el historial de ventas'
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Error al obtener las ventas.',
+        sales: [],
       },
       { status: 500 }
     );
