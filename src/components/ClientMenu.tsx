@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 interface MenuItem {
@@ -8,7 +8,7 @@ interface MenuItem {
   name: string;
   price: number;
   description?: string;
-  image?: string; // ✅ CORREGIDO
+  image?: string;
 }
 
 interface MenuCategory {
@@ -36,8 +36,68 @@ export default function ClientMenu({
   const [paymentMethod, setPaymentMethod] =
     useState('Efectivo / Divisas');
 
-  const [exchangeRate, setExchangeRate] = useState(65.5);
+  // Tasa de respaldo por si todavía no existe una tasa registrada.
+  const [exchangeRate, setExchangeRate] = useState(778.33);
+  const [isLoadingExchangeRate, setIsLoadingExchangeRate] =
+    useState(true);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ============================================================
+  // CARGAR TASA ACTUAL DESDE LA BASE DE DATOS
+  // ============================================================
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadExchangeRate = async () => {
+      try {
+        setIsLoadingExchangeRate(true);
+
+        const response = await fetch('/api/exchange-rate', {
+          method: 'GET',
+          cache: 'no-store',
+        });
+
+        const data = await response.json();
+
+        if (
+          isMounted &&
+          response.ok &&
+          data?.success &&
+          Number(data.rate) > 0
+        ) {
+          setExchangeRate(Number(data.rate));
+        }
+      } catch (error) {
+        console.error(
+          'Error obteniendo la tasa de cambio:',
+          error
+        );
+      } finally {
+        if (isMounted) {
+          setIsLoadingExchangeRate(false);
+        }
+      }
+    };
+
+    loadExchangeRate();
+
+    // Actualizar la tasa automáticamente cada 60 segundos.
+    const interval = setInterval(
+      loadExchangeRate,
+      60000
+    );
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // ============================================================
+  // CARRITO
+  // ============================================================
 
   const addToCart = (product: MenuItem) => {
     setCart((prev) => {
@@ -119,6 +179,10 @@ export default function ClientMenu({
     parseFloat(totalPrice) * exchangeRate
   ).toFixed(2);
 
+  // ============================================================
+  // ENVIAR PEDIDO
+  // ============================================================
+
   const checkoutWhatsApp = async () => {
     if (
       !customerName.trim() ||
@@ -136,6 +200,21 @@ export default function ClientMenu({
     ) {
       alert(
         'Por favor ingresa la dirección exacta para el delivery.'
+      );
+      return;
+    }
+
+    // Evitar registrar un pedido mientras todavía se actualiza la tasa.
+    if (isLoadingExchangeRate) {
+      alert(
+        'Estamos actualizando la tasa de cambio. Intenta nuevamente en unos segundos.'
+      );
+      return;
+    }
+
+    if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) {
+      alert(
+        'No se pudo obtener una tasa de cambio válida.'
       );
       return;
     }
@@ -228,7 +307,9 @@ export default function ClientMenu({
 
     message += `💵 *TOTAL USD:* $${totalPrice}\n`;
 
-    message += `🇻🇪 *TOTAL BS (Tasa ${exchangeRate}):* Bs. ${totalBs}`;
+    message += `🇻🇪 *TOTAL BS (Tasa ${exchangeRate.toFixed(
+      2
+    )}):* Bs. ${totalBs}`;
 
     const encodedURL =
       `https://wa.me/${phone}?text=` +
@@ -249,6 +330,14 @@ export default function ClientMenu({
 
           <span className="text-xs uppercase tracking-widest text-pink-400 font-semibold hidden sm:inline">
             Guarenas - Guatire
+          </span>
+
+          <span className="text-[10px] sm:text-xs text-emerald-400 font-bold">
+            {isLoadingExchangeRate
+              ? 'Actualizando tasa...'
+              : `BCV: Bs. ${exchangeRate.toFixed(
+                  2
+                )} / $1`}
           </span>
         </div>
 
@@ -765,11 +854,20 @@ export default function ClientMenu({
                   <div className="flex justify-between font-bold text-pink-200">
 
                     <span>
-                      Total Bolívares (Tasa {exchangeRate}):
+                      Total Bolívares (
+                      {isLoadingExchangeRate
+                        ? 'Actualizando tasa...'
+                        : `Tasa ${exchangeRate.toFixed(
+                            2
+                          )}`}
+                      ):
                     </span>
 
                     <span>
-                      Bs. {totalBs}
+                      Bs.{' '}
+                      {isLoadingExchangeRate
+                        ? '...'
+                        : totalBs}
                     </span>
 
                   </div>
@@ -778,11 +876,16 @@ export default function ClientMenu({
 
                 <button
                   onClick={checkoutWhatsApp}
-                  disabled={isSubmitting}
+                  disabled={
+                    isSubmitting ||
+                    isLoadingExchangeRate
+                  }
                   className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white py-3 rounded-xl font-extrabold text-sm shadow-xl shadow-emerald-600/30 transition flex items-center justify-center gap-2"
                 >
                   {isSubmitting
                     ? 'Registrando...'
+                    : isLoadingExchangeRate
+                    ? 'Actualizando tasa...'
                     : '🟢 Enviar Pedido por WhatsApp'}
                 </button>
 
