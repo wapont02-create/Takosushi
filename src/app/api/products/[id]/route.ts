@@ -1,22 +1,29 @@
+
 import { NextResponse } from 'next/server';
-import { runQuery } from '../../../../db/client'; // Ajusta la ruta si es necesario
+import { runQuery } from '../../../../db/client';
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> | { id: string } }
-) {
+type RouteContext = {
+  params: Promise<{ id: string }> | { id: string };
+};
+
+function isValidId(id: string) {
+  return /^\d+$/.test(id) && Number(id) > 0;
+}
+
+export async function PUT(request: Request, { params }: RouteContext) {
   try {
-    const resolvedParams = await params;
-    const id = resolvedParams.id;
+    const { id } = await params;
 
-    if (!id || !/^\d+$/.test(String(id))) {
+    if (!isValidId(id)) {
       return NextResponse.json(
         { success: false, error: 'ID de producto inválido' },
         { status: 400 }
       );
     }
 
+    const productId = Number(id);
     const body = await request.json();
+
     const {
       name,
       price,
@@ -30,8 +37,7 @@ export async function PUT(
       image_url,
     } = body;
 
-    // Mantener compatibilidad con el reabastecimiento existente:
-    // si solo llega stock, actualizamos únicamente el stock.
+    // Mantener compatibilidad con el reabastecimiento de inventario.
     const hasOnlyStock =
       stock !== undefined &&
       name === undefined &&
@@ -54,11 +60,13 @@ export async function PUT(
         );
       }
 
-      await runQuery(async (db) => {
-        return await db.sql(
-          `UPDATE products SET stock = ${finalStock} WHERE id = ${Number(id)};`
-        );
-      });
+      await runQuery(async (db) =>
+        db.sql(`
+          UPDATE products
+          SET stock = ${finalStock}
+          WHERE id = ${productId};
+        `)
+      );
 
       return NextResponse.json({
         success: true,
@@ -86,80 +94,107 @@ export async function PUT(
     const finalImageUrl = String(image_url || image || '').trim();
     const finalBarcode = String(barcode || '').trim();
 
-    if (!finalName || !Number.isFinite(finalPrice) || !Number.isFinite(finalStock)) {
+    if (
+      !finalName ||
+      !Number.isFinite(finalPrice) ||
+      finalPrice < 0 ||
+      !Number.isFinite(finalStock) ||
+      finalStock < 0 ||
+      !Number.isFinite(finalCost) ||
+      finalCost < 0
+    ) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Nombre, precio o stock inválido',
+          error: 'Nombre, precio, costo o stock inválido',
         },
         { status: 400 }
       );
     }
 
-    const cleanName = finalName.replace(/'/g, "''");
-    const cleanCategory = finalCategory.replace(/'/g, "''");
-    const cleanDescription = finalDescription.replace(/'/g, "''");
-    const cleanImageUrl = finalImageUrl.replace(/'/g, "''");
-    const cleanBarcode = finalBarcode.replace(/'/g, "''");
+    const escapeSql = (value: string) => value.replace(/'/g, "''");
 
-    await runQuery(async (db) => {
-      return await db.sql(`
+    const cleanName = escapeSql(finalName);
+    const cleanCategory = escapeSql(finalCategory);
+    const cleanDescription = escapeSql(finalDescription);
+    const cleanImageUrl = escapeSql(finalImageUrl);
+    const cleanBarcode = escapeSql(finalBarcode);
+
+    await runQuery(async (db) =>
+      db.sql(`
         UPDATE products SET
           name = '${cleanName}',
           price_usd = ${finalPrice},
           stock = ${finalStock},
           taxable = ${finalTaxable},
           category = '${cleanCategory}',
-          cost_price = ${Number.isFinite(finalCost) ? finalCost : 0},
+          cost_price = ${finalCost},
           image_url = '${cleanImageUrl}',
           description = '${cleanDescription}'
           ${finalBarcode ? `, barcode = '${cleanBarcode}'` : ''}
-        WHERE id = ${Number(id)};
-      `);
-    });
+        WHERE id = ${productId};
+      `)
+    );
 
     return NextResponse.json({
       success: true,
       message: 'Producto actualizado correctamente',
       description: finalDescription,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : 'Error interno al actualizar';
+
     console.error('Error al actualizar el producto:', error);
+
     return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Error interno al actualizar',
-      },
+      { success: false, error: message },
       { status: 500 }
     );
   }
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> | { id: string } }
-) {
+export async function DELETE(request: Request, { params }: RouteContext) {
   try {
-    const resolvedParams = await params;
-    const id = resolvedParams.id;
+    const { id } = await params;
 
-    if (!id) {
-      return NextResponse.json({ success: false, error: 'Falta el ID del producto' }, { status: 400 });
+    if (!isValidId(id)) {
+      return NextResponse.json(
+        { success: false, error: 'ID de producto inválido' },
+        { status: 400 }
+      );
     }
 
-    await runQuery(async (db) => {
-      return await db.sql(`DELETE FROM products WHERE id = ${id};`);
-    });
+    const productId = Number(id);
+
+    await runQuery(async (db) =>
+      db.sql(`DELETE FROM products WHERE id = ${productId};`)
+    );
 
     return NextResponse.json({
       success: true,
-      message: 'Producto eliminado correctamente de la base de datos'
+      message: 'Producto eliminado correctamente de la base de datos',
     });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : 'Error interno al eliminar';
 
-  } catch (error: any) {
-    console.error("Error al eliminar el producto:", error);
+    console.error('Error al eliminar el producto:', error);
+
+    if (/foreign key constraint failed/i.test(message)) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: 'PRODUCT_HAS_REFERENCES',
+          error:
+            'No se puede eliminar este producto porque está relacionado con ventas u otros registros. Conserva el producto para proteger el historial.',
+        },
+        { status: 409 }
+      );
+    }
+
     return NextResponse.json(
-      { success: false, error: error.message || 'Error interno al eliminar' },
+      { success: false, error: message || 'Error interno al eliminar' },
       { status: 500 }
     );
   }
