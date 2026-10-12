@@ -1,29 +1,64 @@
+
 import { NextResponse } from 'next/server';
 import { runQuery } from '../../../db/client';
+
+async function ensureActiveColumn(db: any) {
+  const columns = await db.sql(`PRAGMA table_info(products)`);
+  const exists =
+    Array.isArray(columns) &&
+    columns.some((column: any) => String(column.name).toLowerCase() === 'active');
+
+  if (exists) return;
+
+  try {
+    await db.sql(`
+      ALTER TABLE products
+      ADD COLUMN active INTEGER NOT NULL DEFAULT 1
+    `);
+  } catch (error) {
+    // Si otra solicitud creó la columna al mismo tiempo, verificamos de nuevo.
+    const updatedColumns = await db.sql(`PRAGMA table_info(products)`);
+    const created =
+      Array.isArray(updatedColumns) &&
+      updatedColumns.some(
+        (column: any) => String(column.name).toLowerCase() === 'active'
+      );
+
+    if (!created) throw error;
+  }
+}
 
 export async function GET() {
   try {
     const products = await runQuery(async (db) => {
+      await ensureActiveColumn(db);
+
       return await db.sql(`
         SELECT
-          id,
-          name,
-          barcode,
-          price_usd,
-          stock,
-          taxable,
-          category,
-          cost_price,
-          image_url,
-          description
-        FROM products
-        ORDER BY id DESC
+          p.id,
+          p.name,
+          p.barcode,
+          p.price_usd,
+          p.stock,
+          p.taxable,
+          p.category,
+          p.cost_price,
+          p.image_url,
+          p.description,
+          COALESCE(p.active, 1) AS active,
+          EXISTS (
+            SELECT 1
+            FROM sale_items si
+            WHERE si.product_id = p.id
+          ) AS has_sales
+        FROM products p
+        ORDER BY p.id DESC
       `);
     });
 
     const formattedProducts = Array.isArray(products)
       ? products.map((p: any) => ({
-          id: p.id,
+          id: Number(p.id),
           name: p.name,
           barcode: p.barcode || '',
           price: Number(p.price_usd || 0),
@@ -32,18 +67,15 @@ export async function GET() {
           category: p.category || 'General',
           costPrice: Number(p.cost_price || 0),
           description: p.description || '',
-
-          // IMPORTANTE:
-          // La BD usa image_url
-          // El frontend usa image
           image: p.image_url || '',
+          active: Number(p.active ?? 1) === 1,
+          hasSales: Number(p.has_sales || 0) === 1,
         }))
       : [];
 
     return NextResponse.json(formattedProducts);
   } catch (error: any) {
     console.error('Error en GET /api/products:', error);
-
     return NextResponse.json(
       {
         success: false,
@@ -57,7 +89,6 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-
     const {
       name,
       price,
@@ -67,9 +98,6 @@ export async function POST(request: Request) {
       category,
       costPrice,
       description,
-
-      // Aceptamos image desde el frontend
-      // y también image_url por compatibilidad
       image,
       image_url,
     } = body;
@@ -85,37 +113,25 @@ export async function POST(request: Request) {
     }
 
     const generatedBarcode =
-      barcode ||
-      '759' + Math.floor(100000000 + Math.random() * 900000000);
-
-    const finalStock =
-      stock !== undefined ? Number(stock) : 0;
-
+      barcode || '759' + Math.floor(100000000 + Math.random() * 900000000);
+    const finalStock = stock !== undefined ? Number(stock) : 0;
     const finalTaxable = taxable ? 1 : 0;
+    const finalCategory = category || 'General';
+    const finalCost = costPrice !== undefined ? Number(costPrice) : 0;
+    const finalDescription = String(description || '').trim();
+    const finalImageUrl = String(image_url || image || '').trim();
 
-    const finalCategory =
-      category || 'General';
+    const escapeSql = (value: string) => value.replace(/'/g, "''");
 
-    const finalCost =
-      costPrice !== undefined ? Number(costPrice) : 0;
-
-    const finalDescription =
-      String(description || '').trim();
-
-    // ==================================================
-    // AQUÍ ESTÁ LA CORRECCIÓN PRINCIPAL
-    // ==================================================
-    const finalImageUrl =
-      String(image_url || image || '').trim();
-
-    // Escapamos valores de texto para SQLite
-    const cleanName = String(name).replace(/'/g, "''");
-    const cleanBarcode = String(generatedBarcode).replace(/'/g, "''");
-    const cleanCategory = String(finalCategory).replace(/'/g, "''");
-    const cleanDescription = finalDescription.replace(/'/g, "''");
-    const cleanImageUrl = finalImageUrl.replace(/'/g, "''");
+    const cleanName = escapeSql(String(name).trim());
+    const cleanBarcode = escapeSql(String(generatedBarcode).trim());
+    const cleanCategory = escapeSql(String(finalCategory).trim());
+    const cleanDescription = escapeSql(finalDescription);
+    const cleanImageUrl = escapeSql(finalImageUrl);
 
     await runQuery(async (db) => {
+      await ensureActiveColumn(db);
+
       return await db.sql(`
         INSERT INTO products (
           name,
@@ -126,7 +142,8 @@ export async function POST(request: Request) {
           category,
           cost_price,
           image_url,
-          description
+          description,
+          active
         )
         VALUES (
           '${cleanName}',
@@ -137,7 +154,8 @@ export async function POST(request: Request) {
           '${cleanCategory}',
           ${finalCost},
           '${cleanImageUrl}',
-          '${cleanDescription}'
+          '${cleanDescription}',
+          1
         )
       `);
     });
@@ -148,15 +166,14 @@ export async function POST(request: Request) {
       image: finalImageUrl,
       image_url: finalImageUrl,
       description: finalDescription,
+      active: true,
     });
   } catch (error: any) {
     console.error('Error en POST /api/products:', error);
-
     return NextResponse.json(
       {
         success: false,
-        error:
-          error.message || 'Error al guardar el producto',
+        error: error.message || 'Error al guardar el producto',
       },
       { status: 500 }
     );
