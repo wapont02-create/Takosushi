@@ -11,37 +11,37 @@ function isValidId(id: string) {
 }
 
 async function ensureActiveColumn(db: any) {
-  const columns = await db.sql(`PRAGMA table_info(products)`);
-  const exists =
-    Array.isArray(columns) &&
-    columns.some((column: any) => String(column.name).toLowerCase() === 'active');
+  const columns = await db.sql('PRAGMA table_info(products);');
 
-  if (exists) return;
+  const hasActiveColumn = Array.isArray(columns)
+    ? columns.some((column: any) => column.name === 'active')
+    : false;
 
-  try {
+  if (!hasActiveColumn) {
     await db.sql(`
       ALTER TABLE products
-      ADD COLUMN active INTEGER NOT NULL DEFAULT 1
+      ADD COLUMN active INTEGER NOT NULL DEFAULT 1;
     `);
-  } catch (error) {
-    const updatedColumns = await db.sql(`PRAGMA table_info(products)`);
-    const created =
-      Array.isArray(updatedColumns) &&
-      updatedColumns.some(
-        (column: any) => String(column.name).toLowerCase() === 'active'
-      );
-
-    if (!created) throw error;
   }
 }
 
-export async function PUT(request: Request, { params }: RouteContext) {
+function escapeSql(value: string) {
+  return value.replace(/'/g, "''");
+}
+
+export async function PUT(
+  request: Request,
+  { params }: RouteContext
+) {
   try {
     const { id } = await params;
 
     if (!isValidId(id)) {
       return NextResponse.json(
-        { success: false, error: 'ID de producto inválido' },
+        {
+          success: false,
+          error: 'ID de producto inválido',
+        },
         { status: 400 }
       );
     }
@@ -63,8 +63,9 @@ export async function PUT(request: Request, { params }: RouteContext) {
       active,
     } = body;
 
-    const hasOnlyActive =
-      active !== undefined &&
+    // Activar o desactivar sin modificar los demás datos.
+    if (
+      Object.prototype.hasOwnProperty.call(body, 'active') &&
       name === undefined &&
       price === undefined &&
       stock === undefined &&
@@ -74,41 +75,38 @@ export async function PUT(request: Request, { params }: RouteContext) {
       costPrice === undefined &&
       description === undefined &&
       image === undefined &&
-      image_url === undefined;
-
-    if (hasOnlyActive) {
-      let activeValue: number;
-
-      if (active === true || active === 1 || active === '1') {
-        activeValue = 1;
-      } else if (active === false || active === 0 || active === '0') {
-        activeValue = 0;
-      } else {
+      image_url === undefined
+    ) {
+      if (typeof active !== 'boolean') {
         return NextResponse.json(
-          { success: false, error: 'Estado del producto inválido' },
+          {
+            success: false,
+            error: 'El estado del producto debe ser verdadero o falso',
+          },
           { status: 400 }
         );
       }
 
-      await runQuery(async (db) => {
+      const result = await runQuery(async (db) => {
         await ensureActiveColumn(db);
-        return db.sql(`
+
+        return await db.sql(`
           UPDATE products
-          SET active = ${activeValue}
-          WHERE id = ${productId}
+          SET active = ${active ? 1 : 0}
+          WHERE id = ${productId};
         `);
       });
 
       return NextResponse.json({
         success: true,
-        active: activeValue === 1,
-        message:
-          activeValue === 1
-            ? 'Producto activado correctamente'
-            : 'Producto desactivado correctamente',
+        active,
+        message: active
+          ? 'Producto reactivado correctamente'
+          : 'Producto desactivado correctamente',
       });
     }
 
+    // Actualización exclusiva del stock.
     const hasOnlyStock =
       stock !== undefined &&
       name === undefined &&
@@ -125,7 +123,10 @@ export async function PUT(request: Request, { params }: RouteContext) {
     if (hasOnlyStock) {
       const finalStock = Number(stock);
 
-      if (!Number.isFinite(finalStock) || finalStock < 0) {
+      if (
+        !Number.isFinite(finalStock) ||
+        finalStock < 0
+      ) {
         return NextResponse.json(
           { success: false, error: 'Stock inválido' },
           { status: 400 }
@@ -134,10 +135,11 @@ export async function PUT(request: Request, { params }: RouteContext) {
 
       await runQuery(async (db) => {
         await ensureActiveColumn(db);
-        return db.sql(`
+
+        return await db.sql(`
           UPDATE products
           SET stock = ${finalStock}
-          WHERE id = ${productId}
+          WHERE id = ${productId};
         `);
       });
 
@@ -147,7 +149,12 @@ export async function PUT(request: Request, { params }: RouteContext) {
       });
     }
 
-    if (name === undefined || price === undefined || stock === undefined) {
+    // Edición completa del producto.
+    if (
+      name === undefined ||
+      price === undefined ||
+      stock === undefined
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -162,7 +169,8 @@ export async function PUT(request: Request, { params }: RouteContext) {
     const finalStock = Number(stock);
     const finalTaxable = taxable ? 1 : 0;
     const finalCategory = String(category || 'General').trim();
-    const finalCost = costPrice !== undefined ? Number(costPrice) : 0;
+    const finalCost =
+      costPrice !== undefined ? Number(costPrice) : 0;
     const finalDescription = String(description || '').trim();
     const finalImageUrl = String(image_url || image || '').trim();
     const finalBarcode = String(barcode || '').trim();
@@ -177,12 +185,13 @@ export async function PUT(request: Request, { params }: RouteContext) {
       finalCost < 0
     ) {
       return NextResponse.json(
-        { success: false, error: 'Nombre, precio, costo o stock inválido' },
+        {
+          success: false,
+          error: 'Nombre, precio, costo o stock inválido',
+        },
         { status: 400 }
       );
     }
-
-    const escapeSql = (value: string) => value.replace(/'/g, "''");
 
     const cleanName = escapeSql(finalName);
     const cleanCategory = escapeSql(finalCategory);
@@ -193,8 +202,9 @@ export async function PUT(request: Request, { params }: RouteContext) {
     await runQuery(async (db) => {
       await ensureActiveColumn(db);
 
-      return db.sql(`
-        UPDATE products SET
+      return await db.sql(`
+        UPDATE products
+        SET
           name = '${cleanName}',
           price_usd = ${finalPrice},
           stock = ${finalStock},
@@ -204,7 +214,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
           image_url = '${cleanImageUrl}',
           description = '${cleanDescription}'
           ${finalBarcode ? `, barcode = '${cleanBarcode}'` : ''}
-        WHERE id = ${productId}
+        WHERE id = ${productId};
       `);
     });
 
@@ -215,7 +225,9 @@ export async function PUT(request: Request, { params }: RouteContext) {
     });
   } catch (error: unknown) {
     const message =
-      error instanceof Error ? error.message : 'Error interno al actualizar';
+      error instanceof Error
+        ? error.message
+        : 'Error interno al actualizar';
 
     console.error('Error al actualizar el producto:', error);
 
@@ -226,104 +238,111 @@ export async function PUT(request: Request, { params }: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, { params }: RouteContext) {
+export async function DELETE(
+  request: Request,
+  { params }: RouteContext
+) {
   try {
     const { id } = await params;
 
     if (!isValidId(id)) {
       return NextResponse.json(
-        { success: false, error: 'ID de producto inválido' },
+        {
+          success: false,
+          error: 'ID de producto inválido',
+        },
         { status: 400 }
       );
     }
 
     const productId = Number(id);
 
-    const result = await runQuery(async (db) => {
+    // Garantiza que la columna exista antes de usarla.
+    await runQuery(async (db) => {
       await ensureActiveColumn(db);
-
-      const existing = await db.sql(`
-        SELECT id
-        FROM products
-        WHERE id = ${productId}
-        LIMIT 1
-      `);
-
-      if (!Array.isArray(existing) || existing.length === 0) {
-        return { action: 'not_found' };
-      }
-
-      const sales = await db.sql(`
-        SELECT id
-        FROM sale_items
-        WHERE product_id = ${productId}
-        LIMIT 1
-      `);
-
-      if (Array.isArray(sales) && sales.length > 0) {
-        await db.sql(`
-          UPDATE products
-          SET active = 0
-          WHERE id = ${productId}
-        `);
-
-        return { action: 'deactivated' };
-      }
-
-      try {
-        await db.sql(`
-          DELETE FROM products
-          WHERE id = ${productId}
-        `);
-
-        return { action: 'deleted' };
-      } catch (deleteError: any) {
-        const message = String(deleteError?.message || deleteError);
-
-        if (/foreign key constraint failed/i.test(message)) {
-          await db.sql(`
-            UPDATE products
-            SET active = 0
-            WHERE id = ${productId}
-          `);
-
-          return { action: 'deactivated' };
-        }
-
-        throw deleteError;
-      }
     });
 
-    if (result.action === 'not_found') {
-      return NextResponse.json(
-        { success: false, error: 'El producto no existe' },
-        { status: 404 }
-      );
-    }
+    // Comprobar ventas asociadas antes de intentar borrar.
+    const salesResult = await runQuery(async (db) => {
+      return await db.sql(`
+        SELECT COUNT(*) AS total
+        FROM sale_items
+        WHERE product_id = ${productId};
+      `);
+    });
 
-    if (result.action === 'deactivated') {
+    const salesCount =
+      Array.isArray(salesResult) && salesResult.length > 0
+        ? Number(salesResult[0].total || 0)
+        : 0;
+
+    if (salesCount > 0) {
+      await runQuery(async (db) => {
+        return await db.sql(`
+          UPDATE products
+          SET active = 0
+          WHERE id = ${productId};
+        `);
+      });
+
       return NextResponse.json({
         success: true,
-        action: 'deactivated',
-        active: false,
+        deactivated: true,
         message:
-          'El producto tiene ventas u otras referencias. Se desactivó para conservar el historial.',
+          'El producto tiene ventas asociadas. Se desactivó para proteger el historial.',
       });
     }
 
-    return NextResponse.json({
-      success: true,
-      action: 'deleted',
-      message: 'Producto eliminado definitivamente',
-    });
+    // Si no tiene ventas, intentar eliminarlo definitivamente.
+    try {
+      await runQuery(async (db) => {
+        return await db.sql(`
+          DELETE FROM products
+          WHERE id = ${productId};
+        `);
+      });
+
+      return NextResponse.json({
+        success: true,
+        deactivated: false,
+        message: 'Producto eliminado definitivamente',
+      });
+    } catch (deleteError: unknown) {
+      const message =
+        deleteError instanceof Error
+          ? deleteError.message
+          : '';
+
+      if (/foreign key|constraint failed/i.test(message)) {
+        // Otra tabla lo referencia: conservarlo y desactivarlo.
+        await runQuery(async (db) => {
+          return await db.sql(`
+            UPDATE products
+            SET active = 0
+            WHERE id = ${productId};
+          `);
+        });
+
+        return NextResponse.json({
+          success: true,
+          deactivated: true,
+          message:
+            'El producto está relacionado con otros registros. Se desactivó para proteger los datos.',
+        });
+      }
+
+      throw deleteError;
+    }
   } catch (error: unknown) {
     const message =
-      error instanceof Error ? error.message : 'Error interno al eliminar';
+      error instanceof Error
+        ? error.message
+        : 'Error interno al eliminar';
 
     console.error('Error al eliminar el producto:', error);
 
     return NextResponse.json(
-      { success: false, error: message || 'Error interno al eliminar' },
+      { success: false, error: message },
       { status: 500 }
     );
   }
