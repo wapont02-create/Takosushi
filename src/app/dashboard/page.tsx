@@ -1386,12 +1386,12 @@ export default function DashboardPOS() {
         const salesData =
           await salesRes.json();
 
-       if (
-  salesData?.success &&
-  Array.isArray(salesData.sales)
-) {
-  const formattedSales =
-    salesData.sales.map(
+        if (
+          salesData?.success &&
+          Array.isArray(salesData.sales)
+        ) {
+          const formattedSales =
+            salesData.sales.map(
               (sale: any) => ({
                 id: Number(
                   sale.id
@@ -1415,31 +1415,23 @@ export default function DashboardPOS() {
                       0
                   ),
 
-                totalUSD:
-                  Number(
-                    sale.total_usd ||
-                      sale.totalUSD ||
-                      0
-                  ),
+                totalUSD: Number(
+                  sale.total_usd ?? sale.totalUSD ?? 0
+                ),
 
-                totalBs:
-                  Number(
-                    sale.total_bs ||
-                      sale.totalBs ||
-                      Number(
-                        sale.total_usd ||
-                          sale.totalUSD ||
-                          0
-                      ) *
-                        exchangeRate
-                  ),
+                exchangeRate: Number(
+                  sale.exchange_rate ?? sale.exchangeRate ?? exchangeRate
+                ),
 
-                exchangeRate:
-                  Number(
-                    sale.exchange_rate ||
-                      sale.exchangeRate ||
-                      exchangeRate
-                  ),
+                totalBs: Number(
+                  sale.total_ves ??
+                  sale.total_bs ??
+                  sale.totalBs ??
+                  (
+                    Number(sale.total_usd ?? sale.totalUSD ?? 0) *
+                    Number(sale.exchange_rate ?? sale.exchangeRate ?? exchangeRate)
+                  )
+                ),
 
                 paymentMethod:
                   sale.payment_method ||
