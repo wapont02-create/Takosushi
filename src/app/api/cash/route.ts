@@ -22,6 +22,168 @@ function getRows(result: any): any[] {
 }
 
 /**
+ * Construye el arqueo antes de cerrar la caja. Las ventas antiguas
+ * que no tienen detalle en sale_payments se contabilizan usando payment_method.
+ */
+async function buildCashReport(db: any, register: any, countedUSD: number, countedBs: number) {
+  await db.sql(`
+    CREATE TABLE IF NOT EXISTS sale_payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sale_id INTEGER NOT NULL,
+      method TEXT NOT NULL,
+      currency TEXT NOT NULL,
+      amount REAL NOT NULL DEFAULT 0,
+      amount_usd REAL NOT NULL DEFAULT 0,
+      exchange_rate REAL NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await db.sql(`
+    CREATE TABLE IF NOT EXISTS sale_cash_movements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sale_id INTEGER NOT NULL,
+      currency TEXT NOT NULL,
+      movement_type TEXT NOT NULL,
+      amount REAL NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  const salesResult = await db.sql(`
+    SELECT id, total_usd, total_ves, exchange_rate, payment_method, created_at
+    FROM sales
+    WHERE cash_register_id = ?
+      AND (status = 'completada' OR status IS NULL)
+    ORDER BY id ASC
+  `, Number(register.id));
+  const sales = getRows(salesResult);
+  const saleIds = sales.map((sale: any) => Number(sale.id)).filter((id: number) => id > 0);
+  const paymentRows: any[] = [];
+
+  if (saleIds.length > 0) {
+    const paymentsResult = await db.sql(`
+      SELECT sale_id, method, currency, amount, amount_usd, exchange_rate
+      FROM sale_payments
+      WHERE sale_id IN (${saleIds.map(() => '?').join(',')})
+      ORDER BY id ASC
+    `, ...saleIds);
+    paymentRows.push(...getRows(paymentsResult));
+  }
+
+  const paymentsBySale = new Map<number, any[]>();
+  for (const payment of paymentRows) {
+    const id = Number(payment.sale_id);
+    paymentsBySale.set(id, [...(paymentsBySale.get(id) || []), payment]);
+  }
+
+  let cashOutflowBs = 0;
+  if (saleIds.length > 0) {
+    const movementsResult = await db.sql(`
+      SELECT currency, movement_type, amount
+      FROM sale_cash_movements
+      WHERE sale_id IN (${saleIds.map(() => '?').join(',')})
+    `, ...saleIds);
+    for (const movement of getRows(movementsResult)) {
+      if (String(movement.currency).toUpperCase() === 'VES' && String(movement.movement_type) === 'vuelto') {
+        cashOutflowBs += Number(movement.amount) || 0;
+      }
+    }
+  }
+
+  const methods = new Map<string, { method: string; amountUSD: number; amountVES: number; totalUSD: number; transactions: number }>();
+  let cashSalesUSD = 0;
+  let cashSalesVES = 0;
+  let electronicTotalUSD = 0;
+  let creditTotalUSD = 0;
+  let totalSalesUSD = 0;
+  let totalSalesVES = 0;
+
+  const addPayment = (method: string, currency: string, amount: number, amountUSD: number) => {
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    const key = method || 'Sin método';
+    const item = methods.get(key) || { method: key, amountUSD: 0, amountVES: 0, totalUSD: 0, transactions: 0 };
+    if (currency === 'VES') item.amountVES += amount;
+    else item.amountUSD += amount;
+    item.totalUSD += amountUSD;
+    item.transactions += 1;
+    methods.set(key, item);
+
+    if (method === 'Efectivo USD') cashSalesUSD += currency === 'USD' ? amount : 0;
+    if (method === 'Efectivo Bs') cashSalesVES += currency === 'VES' ? amount : 0;
+    if (['Pago Móvil', 'Zelle', 'Binance Pay'].includes(method)) electronicTotalUSD += amountUSD;
+    if (method === 'Crédito / Fiado') creditTotalUSD += amountUSD;
+  };
+
+  for (const sale of sales) {
+    const saleUSD = Number(sale.total_usd) || 0;
+    const saleVES = Number(sale.total_ves) || 0;
+    totalSalesUSD += saleUSD;
+    totalSalesVES += saleVES;
+    const details = paymentsBySale.get(Number(sale.id)) || [];
+
+    if (details.length > 0) {
+      for (const payment of details) {
+        addPayment(
+          String(payment.method || ''),
+          String(payment.currency || 'USD').toUpperCase(),
+          Number(payment.amount) || 0,
+          Number(payment.amount_usd) || 0
+        );
+      }
+      continue;
+    }
+
+    // Compatibilidad con ventas anteriores a los pagos mixtos.
+    const method = String(sale.payment_method || '');
+    const rate = Number(sale.exchange_rate) || 0;
+    if (method === 'Efectivo Bs' || method === 'Pago Móvil') {
+      const amount = saleVES || (rate > 0 ? saleUSD * rate : 0);
+      addPayment(method, 'VES', amount, saleUSD || (rate > 0 ? amount / rate : 0));
+    } else if (method === 'Efectivo USD' || method === 'Zelle' || method === 'Binance Pay' || method === 'Crédito / Fiado') {
+      addPayment(method, 'USD', saleUSD, saleUSD);
+    } else if (method) {
+      addPayment(method, 'USD', saleUSD, saleUSD);
+    }
+  }
+
+  const openingUSD = Number(register.opening_usd) || 0;
+  const openingBs = Number(register.opening_ves) || 0;
+  const expectedUSD = openingUSD + cashSalesUSD;
+  const expectedBs = openingBs + cashSalesVES - cashOutflowBs;
+
+  return {
+    registerId: Number(register.id),
+    userId: Number(register.user_id),
+    userName: register.user_name || '',
+    userEmail: register.user_email || '',
+    openingDate: register.opening_date,
+    closingDate: new Date().toISOString(),
+    openingUSD,
+    openingBs,
+    salesCount: sales.length,
+    totalSalesUSD,
+    totalSalesVES,
+    cashSalesUSD,
+    cashSalesBs: cashSalesVES,
+    cashOutflowBs,
+    electronicTotalUSD,
+    creditTotalUSD,
+    expectedUSD,
+    expectedBs,
+    countedUSD,
+    countedBs,
+    differenceUSD: countedUSD - expectedUSD,
+    differenceBs: countedBs - expectedBs,
+    paymentBreakdown: Array.from(methods.values()).map(item => ({
+      ...item,
+      amountUSD: Number(item.amountUSD.toFixed(2)),
+      amountVES: Number(item.amountVES.toFixed(2)),
+      totalUSD: Number(item.totalUSD.toFixed(2))
+    }))
+  };
+}
+
+/**
  * ============================================================
  * GET /api/cash
  * ============================================================
@@ -529,6 +691,25 @@ export async function POST(request: Request) {
       }
 
       // ------------------------------------------------------
+      // CALCULAR ARQUEO ANTES DE CERRAR
+      // ------------------------------------------------------
+
+      const report = await runQuery(async (db) => {
+        const fullRegisterResult = await db.sql(
+          `SELECT cr.*, u.name AS user_name, u.email AS user_email
+           FROM cash_registers cr
+           LEFT JOIN users u ON u.id = cr.user_id
+           WHERE cr.id = ? LIMIT 1`,
+          cleanRegisterId
+        );
+        const fullRegisterRows = getRows(fullRegisterResult);
+        if (fullRegisterRows.length === 0) {
+          throw new Error('No se pudo recuperar la caja para generar el arqueo.');
+        }
+        return await buildCashReport(db, fullRegisterRows[0], finalUSD, finalVES);
+      });
+
+      // ------------------------------------------------------
       // CERRAR CAJA
       // ------------------------------------------------------
 
@@ -602,6 +783,7 @@ export async function POST(request: Request) {
           closedRows.length > 0
             ? closedRows[0]
             : null,
+        report,
       });
     }
 
