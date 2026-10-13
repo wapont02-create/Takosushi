@@ -26,6 +26,8 @@ type Product = {
   taxable: boolean;
   stock: number;
   image?: string;
+  active?: boolean;
+  hasSales?: boolean;
 };
 
 type CartItem = Product & {
@@ -2035,10 +2037,13 @@ export default function DashboardPOS() {
       return;
     }
 
+    if (product.active === false) {
+      alert('Este producto está desactivado y no se puede vender.');
+      return;
+    }
+
     if (product.stock <= 0) {
-      alert(
-        'Producto sin stock disponible.'
-      );
+      alert('Este producto no tiene existencias disponibles.');
       return;
     }
 
@@ -3076,6 +3081,57 @@ export default function DashboardPOS() {
       }
     };
 
+  const handleToggleProductActive = async (product: Product) => {
+    const currentlyActive = product.active !== false;
+    const nextActive = !currentlyActive;
+
+    const confirmed = confirm(
+      nextActive
+        ? `¿Deseas reactivar "${product.name}"?`
+        : `¿Deseas desactivar "${product.name}"? Ya no estará disponible para nuevas ventas.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/products/${product.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          active: nextActive,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        alert(data.error || 'No se pudo cambiar el estado del producto.');
+        return;
+      }
+
+      const prodRes = await fetch('/api/products', {
+        cache: 'no-store',
+      });
+
+      const prodData = await prodRes.json();
+
+      if (Array.isArray(prodData)) {
+        setProducts(prodData);
+      }
+
+      alert(
+        nextActive
+          ? 'Producto reactivado correctamente.'
+          : 'Producto desactivado correctamente.'
+      );
+    } catch (error) {
+      console.error('Error cambiando estado del producto:', error);
+      alert('Error de red al actualizar el estado del producto.');
+    }
+  };
+
   /* ============================================================
      CUENTAS POR PAGAR
   ============================================================ */
@@ -3154,6 +3210,8 @@ export default function DashboardPOS() {
 
   const filteredProducts =
     products.filter(p => {
+      const isActive = p.active !== false;
+
       const matchesSearch =
         p.name
           .toLowerCase()
@@ -3173,6 +3231,7 @@ export default function DashboardPOS() {
           selectedCategory;
 
       return (
+        isActive &&
         matchesSearch &&
         matchesCategory
       );
@@ -4598,6 +4657,15 @@ export default function DashboardPOS() {
                                     p.name
                                   }
                                 </span>
+
+                                <span
+                                  className={`ml-2 inline-flex items-center rounded-lg px-2 py-1 text-[9px] font-bold ${
+                                    p.active === false
+                                      ? 'bg-rose-50 text-rose-700'
+                                      : 'bg-emerald-50 text-emerald-700'
+                                  }`}>
+                                  {p.active === false ? 'Desactivado' : 'Activo'}
+                                </span>
                               </td>
 
                               <td className="p-3 text-slate-500">
@@ -4669,6 +4737,19 @@ export default function DashboardPOS() {
                                     className="px-2.5 py-1.5 bg-blue-50 text-blue-700 rounded-lg font-bold hover:bg-blue-100"
                                   >
                                     Editar
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleToggleProductActive(p)
+                                    }
+                                    className={`px-2.5 py-1.5 rounded-lg font-bold ${
+                                      p.active === false
+                                        ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                        : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                    }`}>
+                                    {p.active === false ? 'Reactivar' : 'Desactivar'}
                                   </button>
 
                                   <button
