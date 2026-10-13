@@ -656,6 +656,12 @@ export default function DashboardPOS() {
   const [countedBs, setCountedBs] =
     useState('');
 
+  const [cashClosingReport, setCashClosingReport] =
+    useState<any | null>(null);
+
+  const [showCashClosingReport, setShowCashClosingReport] =
+    useState(false);
+
   /* ============================================================
      INVENTARIO
   ============================================================ */
@@ -1752,25 +1758,15 @@ export default function DashboardPOS() {
           await res.json();
 
         if (data.success) {
-          alert(
-            '¡Caja cerrada y arqueada exitosamente!'
-          );
+          setCashClosingReport(data.report || null);
+          setShowCashClosingReport(Boolean(data.report));
 
-          setShowCloseCashModal(
-            false
-          );
-
+          setShowCloseCashModal(false);
           setCountedUSD('');
           setCountedBs('');
-
           setIsCashOpen(false);
-          setActiveRegisterId(
-            null
-          );
-
-          setActiveTab(
-            'welcome'
-          );
+          setActiveRegisterId(null);
+          setActiveTab('welcome');
         } else {
           alert(
             'Error: ' +
@@ -2472,7 +2468,7 @@ export default function DashboardPOS() {
           }
 
           const legacyPaymentParts: Record<string, { currency: 'USD' | 'VES'; amount: number }> = {
-            'Efectivo USD': { currency: 'USD', amount: totalUSD },
+            'Efectivo USD': { currency: 'USD', amount: givenUSD },
             'Efectivo Bs': { currency: 'VES', amount: totalBs },
             'Pago Móvil': { currency: 'VES', amount: totalBs },
             'Zelle': { currency: 'USD', amount: totalUSD },
@@ -5711,6 +5707,103 @@ export default function DashboardPOS() {
               >
                 Cerrar y Arquear Caja
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================
+          INFORME IMPRIMIBLE DE ARQUEO DE CAJA
+      ====================================================== */}
+      {showCashClosingReport && cashClosingReport && (
+        <div className="fixed inset-0 z-[120] bg-slate-950/70 flex items-center justify-center p-3 overflow-y-auto">
+          <style>{`
+            @media print {
+              body * { visibility: hidden !important; }
+              #cash-closing-print, #cash-closing-print * { visibility: visible !important; }
+              #cash-closing-print { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 18mm !important; box-shadow: none !important; border: 0 !important; border-radius: 0 !important; }
+              .cash-report-actions { display: none !important; }
+              @page { size: auto; margin: 8mm; }
+            }
+          `}</style>
+          <div className="w-full max-w-3xl max-h-[95vh] overflow-y-auto rounded-2xl bg-slate-100 p-3 sm:p-5">
+            <div className="cash-report-actions flex flex-wrap justify-end gap-2 mb-3">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-500"
+              >
+                🖨️ Imprimir / Guardar PDF
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCashClosingReport(false)}
+                className="rounded-xl bg-slate-700 px-5 py-3 text-sm font-bold text-white hover:bg-slate-600"
+              >
+                Cerrar informe
+              </button>
+            </div>
+
+            <div id="cash-closing-print" className="mx-auto max-w-2xl rounded-xl bg-white p-6 sm:p-9 text-slate-900 shadow-lg text-sm">
+              <header className="border-b-2 border-slate-900 pb-4 text-center">
+                <h1 className="text-2xl font-black tracking-wide">TAKOSUSHI</h1>
+                <h2 className="mt-1 text-lg font-bold uppercase">Informe de arqueo de caja</h2>
+                <p className="mt-2 text-xs text-slate-600">Caja #{cashClosingReport.registerId}</p>
+              </header>
+
+              <section className="grid grid-cols-2 gap-3 border-b border-slate-300 py-4 text-xs">
+                <div><span className="text-slate-500">Cajero</span><p className="font-bold">{cashClosingReport.userName || cashClosingReport.userEmail || `Usuario ${cashClosingReport.userId}`}</p></div>
+                <div><span className="text-slate-500">Ventas registradas</span><p className="font-bold">{cashClosingReport.salesCount}</p></div>
+                <div><span className="text-slate-500">Apertura</span><p className="font-semibold">{cashClosingReport.openingDate ? new Date(cashClosingReport.openingDate).toLocaleString('es-VE') : '—'}</p></div>
+                <div><span className="text-slate-500">Cierre</span><p className="font-semibold">{cashClosingReport.closingDate ? new Date(cashClosingReport.closingDate).toLocaleString('es-VE') : '—'}</p></div>
+              </section>
+
+              <section className="py-4">
+                <h3 className="mb-2 font-black uppercase text-xs tracking-wide">Resumen de ventas</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between gap-4"><span>Ventas totales (USD equivalente)</span><b>${Number(cashClosingReport.totalSalesUSD || 0).toFixed(2)}</b></div>
+                  <div className="flex justify-between gap-4"><span>Ventas totales registradas en Bs</span><b>Bs. {Number(cashClosingReport.totalSalesVES || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></div>
+                  <div className="flex justify-between gap-4"><span>Efectivo USD recibido (antes de vuelto)</span><b>${Number(cashClosingReport.cashSalesUSD || 0).toFixed(2)}</b></div>
+                  <div className="flex justify-between gap-4"><span>Efectivo Bs recibido</span><b>Bs. {Number(cashClosingReport.cashSalesBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></div>
+                  <div className="flex justify-between gap-4"><span>Pagos electrónicos (equiv. USD)</span><b>${Number(cashClosingReport.electronicTotalUSD || 0).toFixed(2)}</b></div>
+                  <div className="flex justify-between gap-4"><span>Ventas a crédito / fiado</span><b>${Number(cashClosingReport.creditTotalUSD || 0).toFixed(2)}</b></div>
+                </div>
+              </section>
+
+              <section className="border-t border-slate-300 py-4">
+                <h3 className="mb-2 font-black uppercase text-xs tracking-wide">Detalle por método de pago</h3>
+                <table className="w-full border-collapse text-xs">
+                  <thead><tr className="border-b border-slate-400 text-left"><th className="py-2 pr-2">Método</th><th className="py-2 pr-2 text-right">Monto USD</th><th className="py-2 pr-2 text-right">Monto Bs</th><th className="py-2 text-right">Equiv. USD</th></tr></thead>
+                  <tbody>
+                    {(cashClosingReport.paymentBreakdown || []).map((item: any, index: number) => (
+                      <tr key={`${item.method}-${index}`} className="border-b border-slate-200">
+                        <td className="py-2 pr-2">{item.method}</td>
+                        <td className="py-2 pr-2 text-right">${Number(item.amountUSD || 0).toFixed(2)}</td>
+                        <td className="py-2 pr-2 text-right">Bs. {Number(item.amountVES || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="py-2 text-right">${Number(item.totalUSD || 0).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                    {(!cashClosingReport.paymentBreakdown || cashClosingReport.paymentBreakdown.length === 0) && <tr><td colSpan={4} className="py-3 text-center text-slate-500">No hay ventas registradas en esta caja.</td></tr>}
+                  </tbody>
+                </table>
+              </section>
+
+              <section className="border-y-2 border-slate-900 py-4">
+                <h3 className="mb-3 font-black uppercase text-xs tracking-wide">Conciliación de efectivo físico</h3>
+                <div className="grid grid-cols-3 gap-2 text-xs font-bold"><div></div><div className="text-right">USD</div><div className="text-right">Bolívares</div></div>
+                <div className="mt-2 grid grid-cols-3 gap-2 text-xs"><span>Saldo inicial</span><span className="text-right">${Number(cashClosingReport.openingUSD || 0).toFixed(2)}</span><span className="text-right">Bs. {Number(cashClosingReport.openingBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                <div className="mt-2 grid grid-cols-3 gap-2 text-xs"><span>+ Efectivo recibido</span><span className="text-right">${Number(cashClosingReport.cashSalesUSD || 0).toFixed(2)}</span><span className="text-right">Bs. {Number(cashClosingReport.cashSalesBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                <div className="mt-2 grid grid-cols-3 gap-2 text-xs"><span>− Vuelto entregado en Bs</span><span className="text-right">—</span><span className="text-right">− Bs. {Number(cashClosingReport.cashOutflowBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                <div className="mt-2 grid grid-cols-3 gap-2 border-t border-slate-300 pt-2 text-xs font-black"><span>Esperado en caja</span><span className="text-right">${Number(cashClosingReport.expectedUSD || 0).toFixed(2)}</span><span className="text-right">Bs. {Number(cashClosingReport.expectedBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                <div className="mt-2 grid grid-cols-3 gap-2 text-xs"><span>Contado por cajero</span><span className="text-right">${Number(cashClosingReport.countedUSD || 0).toFixed(2)}</span><span className="text-right">Bs. {Number(cashClosingReport.countedBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                <div className="mt-2 grid grid-cols-3 gap-2 border-t border-slate-300 pt-2 text-sm font-black"><span>Diferencia</span><span className={`text-right ${Number(cashClosingReport.differenceUSD) < -0.009 ? 'text-red-700' : Number(cashClosingReport.differenceUSD) > 0.009 ? 'text-emerald-700' : ''}`}>{Number(cashClosingReport.differenceUSD) > 0 ? '+' : ''}${Number(cashClosingReport.differenceUSD || 0).toFixed(2)}</span><span className={`text-right ${Number(cashClosingReport.differenceBs) < -0.009 ? 'text-red-700' : Number(cashClosingReport.differenceBs) > 0.009 ? 'text-emerald-700' : ''}`}>{Number(cashClosingReport.differenceBs) > 0 ? '+' : ''}Bs. {Number(cashClosingReport.differenceBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                <p className="mt-3 text-center text-xs font-bold">{Math.abs(Number(cashClosingReport.differenceUSD || 0)) < 0.01 && Math.abs(Number(cashClosingReport.differenceBs || 0)) < 0.01 ? 'CAJA CUADRADA' : 'REVISAR DIFERENCIA DE CAJA'}</p>
+              </section>
+
+              <footer className="pt-8 text-xs text-slate-600">
+                <div className="grid grid-cols-2 gap-8 text-center"><div className="border-t border-slate-500 pt-2">Firma del cajero</div><div className="border-t border-slate-500 pt-2">Revisión / supervisor</div></div>
+                <p className="mt-6 text-center">Informe generado por el sistema POS TAKOSUSHI.</p>
+              </footer>
             </div>
           </div>
         </div>
