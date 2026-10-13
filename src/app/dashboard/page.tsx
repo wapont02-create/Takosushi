@@ -40,7 +40,8 @@ type PaymentMethodType =
   | 'Pago Móvil'
   | 'Zelle'
   | 'Binance Pay'
-  | 'Crédito / Fiado';
+  | 'Crédito / Fiado'
+  | 'Pago mixto';
 
 type SaleRecord = {
   id: number;
@@ -748,6 +749,24 @@ export default function DashboardPOS() {
 
   const [cashGivenUSD, setCashGivenUSD] =
     useState<string>('');
+
+  const [isMixedPayment, setIsMixedPayment] =
+    useState(false);
+
+  const [mixedCashUSD, setMixedCashUSD] =
+    useState('');
+
+  const [mixedCashBs, setMixedCashBs] =
+    useState('');
+
+  const [mixedPagoMovilBs, setMixedPagoMovilBs] =
+    useState('');
+
+  const [mixedZelleUSD, setMixedZelleUSD] =
+    useState('');
+
+  const [mixedBinanceUSD, setMixedBinanceUSD] =
+    useState('');
 
   const [paymentMethod, setPaymentMethod] =
     useState<PaymentMethodType>(
@@ -2005,6 +2024,12 @@ export default function DashboardPOS() {
     );
 
     setCashGivenUSD('');
+    setIsMixedPayment(false);
+    setMixedCashUSD('');
+    setMixedCashBs('');
+    setMixedPagoMovilBs('');
+    setMixedZelleUSD('');
+    setMixedBinanceUSD('');
 
     setIsCheckoutModalOpen(
       false
@@ -2350,32 +2375,122 @@ export default function DashboardPOS() {
 
         let changeUSD = 0;
         let changeBs = 0;
+        let effectivePaymentMethod: PaymentMethodType = paymentMethod;
 
-        if (
-          paymentMethod ===
-          'Efectivo USD'
-        ) {
+        const paymentParts: Array<{
+          method: string;
+          currency: 'USD' | 'VES';
+          amount: number;
+        }> = [];
+
+        if (isMixedPayment) {
+          const usdCash = Number(mixedCashUSD || 0);
+          const bsCash = Number(mixedCashBs || 0);
+          const pagoMovilBs = Number(mixedPagoMovilBs || 0);
+          const zelleUSD = Number(mixedZelleUSD || 0);
+          const binanceUSD = Number(mixedBinanceUSD || 0);
+
+          const enteredAmounts = [
+            usdCash, bsCash, pagoMovilBs, zelleUSD, binanceUSD
+          ];
+
           if (
-            givenUSD < totalUSD
+            enteredAmounts.some(
+              amount => !Number.isFinite(amount) || amount < 0
+            )
           ) {
-            alert(
-              'El monto entregado es menor al total.'
-            );
-
+            alert('Verifique los montos del pago mixto.');
             return;
           }
 
-          changeUSD =
-            givenUSD -
-            totalUSD;
+          if (effectiveExchangeRate <= 0) {
+            alert('La tasa de cambio debe ser mayor que cero para usar bolívares.');
+            return;
+          }
 
-          changeBs =
-            changeUSD *
-            effectiveExchangeRate;
+          if (usdCash > 0) {
+            paymentParts.push({
+              method: 'Efectivo USD',
+              currency: 'USD',
+              amount: usdCash
+            });
+          }
+          if (bsCash > 0) {
+            paymentParts.push({
+              method: 'Efectivo Bs',
+              currency: 'VES',
+              amount: bsCash
+            });
+          }
+          if (pagoMovilBs > 0) {
+            paymentParts.push({
+              method: 'Pago Móvil',
+              currency: 'VES',
+              amount: pagoMovilBs
+            });
+          }
+          if (zelleUSD > 0) {
+            paymentParts.push({
+              method: 'Zelle',
+              currency: 'USD',
+              amount: zelleUSD
+            });
+          }
+          if (binanceUSD > 0) {
+            paymentParts.push({
+              method: 'Binance Pay',
+              currency: 'USD',
+              amount: binanceUSD
+            });
+          }
+
+          const paidUSD = usdCash + zelleUSD + binanceUSD +
+            (bsCash + pagoMovilBs) / effectiveExchangeRate;
+
+          if (paymentParts.length < 2) {
+            alert('Seleccione al menos dos formas de pago para un pago mixto.');
+            return;
+          }
+
+          if (Math.abs(paidUSD - totalUSD) > 0.02) {
+            alert(
+              `El pago no cuadra con el total. Recibido: $${paidUSD.toFixed(2)}; total: $${totalUSD.toFixed(2)}. Ajuste los montos.`
+            );
+            return;
+          }
+
+          effectivePaymentMethod = 'Pago mixto';
+        } else {
+          if (paymentMethod === 'Efectivo USD') {
+            if (givenUSD < totalUSD) {
+              alert('El monto entregado es menor al total.');
+              return;
+            }
+
+            changeUSD = givenUSD - totalUSD;
+            changeBs = changeUSD * effectiveExchangeRate;
+          }
+
+          const legacyPaymentParts: Record<string, { currency: 'USD' | 'VES'; amount: number }> = {
+            'Efectivo USD': { currency: 'USD', amount: totalUSD },
+            'Efectivo Bs': { currency: 'VES', amount: totalBs },
+            'Pago Móvil': { currency: 'VES', amount: totalBs },
+            'Zelle': { currency: 'USD', amount: totalUSD },
+            'Binance Pay': { currency: 'USD', amount: totalUSD },
+            'Crédito / Fiado': { currency: 'USD', amount: totalUSD }
+          };
+          const part = legacyPaymentParts[paymentMethod];
+          if (part) {
+            paymentParts.push({
+              method: paymentMethod,
+              currency: part.currency,
+              amount: part.amount
+            });
+          }
         }
 
         if (
-          paymentMethod ===
+          effectivePaymentMethod ===
             'Crédito / Fiado' &&
           !clientName.trim()
         ) {
@@ -2401,7 +2516,8 @@ export default function DashboardPOS() {
           exchangeRate:
             effectiveExchangeRate,
 
-          paymentMethod,
+          paymentMethod: effectivePaymentMethod,
+          payments: paymentParts,
           changeUSD,
 
           clientName:
@@ -2489,7 +2605,7 @@ export default function DashboardPOS() {
             exchangeRate:
               effectiveExchangeRate,
 
-            paymentMethod,
+            paymentMethod: effectivePaymentMethod,
             changeUSD,
 
             clientName:
@@ -2596,7 +2712,7 @@ export default function DashboardPOS() {
           changeBs,
 
           isCredit:
-            paymentMethod ===
+            effectivePaymentMethod ===
             'Crédito / Fiado',
 
           clientName:
@@ -2615,6 +2731,12 @@ export default function DashboardPOS() {
         );
 
         setCashGivenUSD('');
+        setIsMixedPayment(false);
+        setMixedCashUSD('');
+        setMixedCashBs('');
+        setMixedPagoMovilBs('');
+        setMixedZelleUSD('');
+        setMixedBinanceUSD('');
         setClientName('');
         setClientPhone('');
         setClientDocument('');
@@ -5702,10 +5824,11 @@ export default function DashboardPOS() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">
-                    Método de pago
+                    Método de pago (modo individual)
                   </label>
 
                   <select
+                    disabled={isMixedPayment}
                     value={
                       paymentMethod
                     }
@@ -5743,7 +5866,7 @@ export default function DashboardPOS() {
                   </select>
                 </div>
 
-                {paymentMethod ===
+                {!isMixedPayment && paymentMethod ===
                   'Efectivo USD' && (
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1">
@@ -5770,6 +5893,68 @@ export default function DashboardPOS() {
                   </div>
                 )}
               </div>
+
+              <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-3">
+                <label className="flex items-center gap-2 text-xs font-extrabold text-blue-900 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isMixedPayment}
+                    onChange={e => {
+                      setIsMixedPayment(e.target.checked);
+                      if (e.target.checked && paymentMethod === 'Crédito / Fiado') {
+                        setPaymentMethod('Efectivo USD');
+                      }
+                      setCashGivenUSD('');
+                      setMixedCashUSD('');
+                      setMixedCashBs('');
+                      setMixedPagoMovilBs('');
+                      setMixedZelleUSD('');
+                      setMixedBinanceUSD('');
+                    }}
+                    className="h-4 w-4 accent-blue-600"
+                  />
+                  Permitir pago mixto (varios métodos)
+                </label>
+                <p className="mt-1 text-[10px] text-blue-800">
+                  Introduzca cuánto aporta cada método. Los bolívares se convierten con la tasa vigente.
+                </p>
+              </div>
+
+              {isMixedPayment ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-2xl border border-slate-200 p-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Efectivo USD aplicado</label>
+                    <input type="number" min="0" step="0.01" value={mixedCashUSD} onChange={e => setMixedCashUSD(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Efectivo Bs aplicado</label>
+                    <input type="number" min="0" step="0.01" value={mixedCashBs} onChange={e => setMixedCashBs(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Pago Móvil (Bs)</label>
+                    <input type="number" min="0" step="0.01" value={mixedPagoMovilBs} onChange={e => setMixedPagoMovilBs(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Zelle (USD)</label>
+                    <input type="number" min="0" step="0.01" value={mixedZelleUSD} onChange={e => setMixedZelleUSD(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Binance Pay (USD)</label>
+                    <input type="number" min="0" step="0.01" value={mixedBinanceUSD} onChange={e => setMixedBinanceUSD(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs" placeholder="0.00" />
+                  </div>
+                  <div className="sm:col-span-2 rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs space-y-1">
+                    <div className="flex justify-between">
+                      <span>Equivalente ingresado</span>
+                      <b>${(Number(mixedCashUSD || 0) + Number(mixedZelleUSD || 0) + Number(mixedBinanceUSD || 0) + (Number(mixedCashBs || 0) + Number(mixedPagoMovilBs || 0)) / Math.max(effectiveExchangeRate, 1)).toFixed(2)}</b>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Total de la venta</span>
+                      <b>${totalUSD.toFixed(2)}</b>
+                    </div>
+                    <p className="text-[10px] text-slate-500">La suma debe coincidir con el total antes de confirmar.</p>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
                 {loadedWebOrder && (
