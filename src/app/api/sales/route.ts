@@ -149,6 +149,7 @@ export async function POST(
       exchangeRate,
       paymentMethod,
       payments,
+      changeUSD,
       userId,
       cashRegisterId,
       cash_register_id,
@@ -171,6 +172,10 @@ export async function POST(
     const normalizedExchangeRate = Number(
       exchangeRate ?? 0
     );
+    const normalizedChangeUSD = Math.max(0, Number(changeUSD) || 0);
+    if (normalizedChangeUSD > 0 && paymentMethod !== 'Efectivo USD') {
+      throw new Error('El vuelto registrado corresponde únicamente a pagos en efectivo USD.');
+    }
 
     const allowedPaymentMethods = new Set([
       'Efectivo USD',
@@ -225,9 +230,10 @@ export async function POST(
         0
       );
 
-      if (Math.abs(paymentTotalUSD - normalizedTotalUSD) > 0.03) {
+      const netPaymentUSD = paymentTotalUSD - normalizedChangeUSD;
+      if (Math.abs(netPaymentUSD - normalizedTotalUSD) > 0.03) {
         throw new Error(
-          `Los pagos suman $${paymentTotalUSD.toFixed(2)} y la venta total es $${normalizedTotalUSD.toFixed(2)}.`
+          `Los pagos netos suman $${netPaymentUSD.toFixed(2)} y la venta total es $${normalizedTotalUSD.toFixed(2)}.`
         );
       }
     } else {
@@ -346,6 +352,19 @@ export async function POST(
             amount REAL NOT NULL DEFAULT 0,
             amount_usd REAL NOT NULL DEFAULT 0,
             exchange_rate REAL NOT NULL DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+          )
+        `
+      );
+      await sql(
+        db,
+        `
+          CREATE TABLE IF NOT EXISTS sale_cash_movements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sale_id INTEGER NOT NULL,
+            currency TEXT NOT NULL,
+            movement_type TEXT NOT NULL,
+            amount REAL NOT NULL DEFAULT 0,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
           )
         `
@@ -727,6 +746,17 @@ export async function POST(
 
         await savePayments(directSaleId);
 
+        // En ventas cobradas en USD, el vuelto actual se entrega en Bs.
+        // Guardarlo como salida de caja para que el arqueo no lo cuente como efectivo disponible.
+        if (normalizedChangeUSD > 0 && normalizedExchangeRate > 0 && paymentMethod === 'Efectivo USD') {
+          await sql(
+            db,
+            `INSERT INTO sale_cash_movements (sale_id, currency, movement_type, amount, created_at)
+             VALUES (?, 'VES', 'vuelto', ?, ?)`,
+            [directSaleId, normalizedChangeUSD * normalizedExchangeRate, new Date().toISOString()]
+          );
+        }
+
         for (const item of normalizedItems) {
           await sql(
             db,
@@ -833,6 +863,17 @@ export async function GET() {
               created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
           `
+        );
+        await sql(
+          db,
+          `CREATE TABLE IF NOT EXISTS sale_cash_movements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sale_id INTEGER NOT NULL,
+            currency TEXT NOT NULL,
+            movement_type TEXT NOT NULL,
+            amount REAL NOT NULL DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+          )`
         );
 
         return await sql(
