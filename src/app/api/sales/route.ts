@@ -148,6 +148,7 @@ export async function POST(
       totalBs,
       exchangeRate,
       paymentMethod,
+      payments,
       userId,
       cashRegisterId,
       cash_register_id,
@@ -170,6 +171,81 @@ export async function POST(
     const normalizedExchangeRate = Number(
       exchangeRate ?? 0
     );
+
+    const allowedPaymentMethods = new Set([
+      'Efectivo USD',
+      'Efectivo Bs',
+      'Pago Móvil',
+      'Zelle',
+      'Binance Pay',
+      'Crédito / Fiado'
+    ]);
+
+    let normalizedPayments: Array<{
+      method: string;
+      currency: 'USD' | 'VES';
+      amount: number;
+      amountUSD: number;
+    }> = [];
+
+    if (Array.isArray(payments) && payments.length > 0) {
+      normalizedPayments = payments.map((payment: any) => {
+        const method = String(payment?.method || '').trim();
+        const currency = String(payment?.currency || '').toUpperCase();
+        const amount = Number(payment?.amount);
+
+        if (!allowedPaymentMethods.has(method)) {
+          throw new Error(`Método de pago no permitido: ${method || 'vacío'}.`);
+        }
+        if (currency !== 'USD' && currency !== 'VES') {
+          throw new Error(`Moneda inválida para el método ${method}.`);
+        }
+        if (!Number.isFinite(amount) || amount <= 0) {
+          throw new Error(`El monto de ${method} debe ser mayor que cero.`);
+        }
+
+        const expectsVES = method === 'Efectivo Bs' || method === 'Pago Móvil';
+        if ((expectsVES && currency !== 'VES') || (!expectsVES && currency !== 'USD')) {
+          throw new Error(`La moneda no corresponde al método ${method}.`);
+        }
+        if (currency === 'VES' && normalizedExchangeRate <= 0) {
+          throw new Error('La tasa de cambio debe ser mayor que cero para pagos en bolívares.');
+        }
+
+        return {
+          method,
+          currency: currency as 'USD' | 'VES',
+          amount,
+          amountUSD: currency === 'USD' ? amount : amount / normalizedExchangeRate
+        };
+      });
+
+      const paymentTotalUSD = normalizedPayments.reduce(
+        (sum, payment) => sum + payment.amountUSD,
+        0
+      );
+
+      if (Math.abs(paymentTotalUSD - normalizedTotalUSD) > 0.03) {
+        throw new Error(
+          `Los pagos suman $${paymentTotalUSD.toFixed(2)} y la venta total es $${normalizedTotalUSD.toFixed(2)}.`
+        );
+      }
+    } else {
+      const method = String(paymentMethod || '').trim();
+      if (method === 'Pago mixto') {
+        throw new Error('El pago mixto necesita registrar sus componentes.');
+      }
+      if (method) {
+        const isVES = method === 'Efectivo Bs' || method === 'Pago Móvil';
+        const amount = isVES ? normalizedTotalBs : normalizedTotalUSD;
+        normalizedPayments = [{
+          method,
+          currency: isVES ? 'VES' : 'USD',
+          amount,
+          amountUSD: normalizedTotalUSD
+        }];
+      }
+    }
 
     if (
       !Number.isFinite(normalizedTotalUSD) ||
@@ -256,6 +332,26 @@ export async function POST(
       );
     }
 
+    // Crear la tabla de detalle de pagos si todavía no existe.
+    // No modifica ni elimina los registros de ventas existentes.
+    await runQuery(async db => {
+      await sql(
+        db,
+        `
+          CREATE TABLE IF NOT EXISTS sale_payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sale_id INTEGER NOT NULL,
+            method TEXT NOT NULL,
+            currency TEXT NOT NULL,
+            amount REAL NOT NULL DEFAULT 0,
+            amount_usd REAL NOT NULL DEFAULT 0,
+            exchange_rate REAL NOT NULL DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+          )
+        `
+      );
+    });
+
     const result = await runQuery(
       async db => {
         // ==========================================
@@ -312,6 +408,35 @@ export async function POST(
             'La caja abierta no pertenece al usuario actual.'
           );
         }
+
+        const savePayments = async (saleId: number) => {
+          for (const payment of normalizedPayments) {
+            await sql(
+              db,
+              `
+                INSERT INTO sale_payments (
+                  sale_id,
+                  method,
+                  currency,
+                  amount,
+                  amount_usd,
+                  exchange_rate,
+                  created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+              `,
+              [
+                saleId,
+                payment.method,
+                payment.currency,
+                payment.amount,
+                payment.amountUSD,
+                normalizedExchangeRate,
+                new Date().toISOString()
+              ]
+            );
+          }
+        };
 
         // ==========================================
         // PEDIDO WEB
@@ -427,6 +552,8 @@ export async function POST(
               parsedWebOrderId
             ]
           );
+
+          await savePayments(parsedWebOrderId);
 
           for (const item of webItems) {
             await sql(
@@ -598,6 +725,8 @@ export async function POST(
           saleRows[0].id
         );
 
+        await savePayments(directSaleId);
+
         for (const item of normalizedItems) {
           await sql(
             db,
@@ -690,6 +819,22 @@ export async function GET() {
   try {
     const result = await runQuery(
       async db => {
+        await sql(
+          db,
+          `
+            CREATE TABLE IF NOT EXISTS sale_payments (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              sale_id INTEGER NOT NULL,
+              method TEXT NOT NULL,
+              currency TEXT NOT NULL,
+              amount REAL NOT NULL DEFAULT 0,
+              amount_usd REAL NOT NULL DEFAULT 0,
+              exchange_rate REAL NOT NULL DEFAULT 0,
+              created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+          `
+        );
+
         return await sql(
           db,
           `
@@ -728,9 +873,41 @@ export async function GET() {
       }
     );
 
+    const sales = extractRows(result);
+
+    const paymentResult = await runQuery(async db => {
+      return await sql(
+        db,
+        `
+          SELECT
+            sale_id,
+            method,
+            currency,
+            amount,
+            amount_usd,
+            exchange_rate
+          FROM sale_payments
+          ORDER BY id ASC
+        `
+      );
+    });
+
+    const paymentRows = extractRows(paymentResult);
+    const paymentsBySale = new Map<number, any[]>();
+
+    for (const payment of paymentRows) {
+      const saleId = Number(payment.sale_id);
+      const current = paymentsBySale.get(saleId) || [];
+      current.push(payment);
+      paymentsBySale.set(saleId, current);
+    }
+
     return NextResponse.json({
       success: true,
-      sales: extractRows(result)
+      sales: sales.map((sale: any) => ({
+        ...sale,
+        payments: paymentsBySale.get(Number(sale.id)) || []
+      }))
     });
   } catch (error) {
     console.error(
