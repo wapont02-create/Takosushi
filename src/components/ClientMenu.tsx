@@ -1,3 +1,4 @@
+```tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -16,50 +17,38 @@ interface MenuCategory {
   items: MenuItem[];
 }
 
+interface CartItem {
+  id: number;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
 export default function ClientMenu({
   initialCategories,
 }: {
   initialCategories: MenuCategory[];
 }) {
-  const [cart, setCart] = useState<
-    {
-      id: number;
-      name: string;
-      price: number;
-      quantity: number;
-    }[]
-  >([]);
-
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
 
-  const [orderType, setOrderType] =
-    useState('Local / Mesa');
+  const [orderType, setOrderType] = useState('Local / Mesa');
+  const [deliveryZone, setDeliveryZone] = useState('Guarenas');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('Efectivo / Divisas');
 
-  const [deliveryZone, setDeliveryZone] =
-    useState('Guarenas');
+  const [exchangeRate, setExchangeRate] = useState(778.33);
+  const [isLoadingExchangeRate, setIsLoadingExchangeRate] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [deliveryAddress, setDeliveryAddress] =
-    useState('');
-
-  const [paymentMethod, setPaymentMethod] =
-    useState('Efectivo / Divisas');
-
-  // Tasa de respaldo por si todavía no existe una tasa registrada.
-  const [exchangeRate, setExchangeRate] =
-    useState(778.33);
-
-  const [
-    isLoadingExchangeRate,
-    setIsLoadingExchangeRate,
-  ] = useState(true);
-
-  const [isSubmitting, setIsSubmitting] =
-    useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('Todos');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // ============================================================
-  // CARGAR TASA ACTUAL DESDE LA BASE DE DATOS
+  // TASA DE CAMBIO
   // ============================================================
 
   useEffect(() => {
@@ -67,15 +56,10 @@ export default function ClientMenu({
 
     const loadExchangeRate = async () => {
       try {
-        setIsLoadingExchangeRate(true);
-
-        const response = await fetch(
-          '/api/exchange-rate',
-          {
-            method: 'GET',
-            cache: 'no-store',
-          }
-        );
+        const response = await fetch('/api/exchange-rate', {
+          method: 'GET',
+          cache: 'no-store',
+        });
 
         const data = await response.json();
 
@@ -85,15 +69,10 @@ export default function ClientMenu({
           data?.success &&
           Number(data.rate) > 0
         ) {
-          setExchangeRate(
-            Number(data.rate)
-          );
+          setExchangeRate(Number(data.rate));
         }
       } catch (error) {
-        console.error(
-          'Error obteniendo la tasa de cambio:',
-          error
-        );
+        console.error('Error obteniendo la tasa de cambio:', error);
       } finally {
         if (isMounted) {
           setIsLoadingExchangeRate(false);
@@ -103,11 +82,7 @@ export default function ClientMenu({
 
     loadExchangeRate();
 
-    // Actualizar la tasa automáticamente cada 60 segundos.
-    const interval = setInterval(
-      loadExchangeRate,
-      60000
-    );
+    const interval = setInterval(loadExchangeRate, 60000);
 
     return () => {
       isMounted = false;
@@ -116,24 +91,46 @@ export default function ClientMenu({
   }, []);
 
   // ============================================================
+  // CATEGORÍAS Y BÚSQUEDA
+  // ============================================================
+
+  const categories = [
+    'Todos',
+    ...initialCategories.map((cat) => cat.category),
+  ];
+
+  const visibleCategories = initialCategories
+    .filter(
+      (cat) =>
+        selectedCategory === 'Todos' ||
+        cat.category === selectedCategory
+    )
+    .map((cat) => ({
+      ...cat,
+      items: cat.items.filter((product) => {
+        const query = searchTerm.trim().toLowerCase();
+
+        return (
+          !query ||
+          product.name.toLowerCase().includes(query) ||
+          (product.description || '').toLowerCase().includes(query)
+        );
+      }),
+    }))
+    .filter((cat) => cat.items.length > 0);
+
+  // ============================================================
   // CARRITO
   // ============================================================
 
   const addToCart = (product: MenuItem) => {
     setCart((prev) => {
-      const existing = prev.find(
-        (item) =>
-          item.id === product.id
-      );
+      const existing = prev.find((item) => item.id === product.id);
 
       if (existing) {
         return prev.map((item) =>
           item.id === product.id
-            ? {
-                ...item,
-                quantity:
-                  item.quantity + 1,
-              }
+            ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
@@ -150,41 +147,27 @@ export default function ClientMenu({
     });
   };
 
-  const updateQuantity = (
-    id: number,
-    delta: number
-  ) => {
+  const updateQuantity = (id: number, delta: number) => {
     setCart((prev) =>
       prev
         .map((item) => {
-          if (item.id === id) {
-            const newQty =
-              item.quantity + delta;
+          if (item.id !== id) return item;
 
-            return newQty > 0
-              ? {
-                  ...item,
-                  quantity: newQty,
-                }
-              : null;
-          }
+          const quantity = item.quantity + delta;
 
-          return item;
+          return quantity > 0 ? { ...item, quantity } : null;
         })
-        .filter(Boolean) as typeof cart
+        .filter((item): item is CartItem => item !== null)
     );
   };
 
   const totalItems = cart.reduce(
-    (sum, item) =>
-      sum + item.quantity,
+    (sum, item) => sum + item.quantity,
     0
   );
 
   const subtotalPrice = cart.reduce(
-    (sum, item) =>
-      sum +
-      item.price * item.quantity,
+    (sum, item) => sum + item.price * item.quantity,
     0
   );
 
@@ -195,115 +178,66 @@ export default function ClientMenu({
         : 3
       : 0;
 
-  const totalPrice = (
-    subtotalPrice +
-    deliveryCost
-  ).toFixed(2);
+  const totalPrice = (subtotalPrice + deliveryCost).toFixed(2);
 
   const totalBs = (
-    parseFloat(totalPrice) *
-    exchangeRate
+    parseFloat(totalPrice) * exchangeRate
   ).toFixed(2);
 
   // ============================================================
-  // ENVIAR PEDIDO
+  // REGISTRAR PEDIDO Y ABRIR WHATSAPP
   // ============================================================
 
   const checkoutWhatsApp = async () => {
     if (cart.length === 0) {
-      alert(
-        'Agrega al menos un producto al carrito.'
-      );
+      alert('Agrega al menos un producto al carrito.');
       return;
     }
 
-    if (
-      !customerName.trim() ||
-      !customerPhone.trim()
-    ) {
-      alert(
-        'Por favor ingresa tu Nombre y Teléfono de contacto.'
-      );
+    if (!customerName.trim() || !customerPhone.trim()) {
+      alert('Por favor ingresa tu nombre y teléfono de contacto.');
       return;
     }
 
-    if (
-      orderType === 'Delivery' &&
-      !deliveryAddress.trim()
-    ) {
-      alert(
-        'Por favor ingresa la dirección exacta para el delivery.'
-      );
+    if (orderType === 'Delivery' && !deliveryAddress.trim()) {
+      alert('Por favor ingresa la dirección exacta para el delivery.');
       return;
     }
 
-    // Evitar registrar un pedido mientras todavía se actualiza la tasa.
     if (isLoadingExchangeRate) {
-      alert(
-        'Estamos actualizando la tasa de cambio. Intenta nuevamente en unos segundos.'
-      );
+      alert('Estamos actualizando la tasa de cambio. Intenta nuevamente.');
       return;
     }
 
-    if (
-      !Number.isFinite(exchangeRate) ||
-      exchangeRate <= 0
-    ) {
-      alert(
-        'No se pudo obtener una tasa de cambio válida.'
-      );
+    if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) {
+      alert('No se pudo obtener una tasa de cambio válida.');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(
-        '/api/orders',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type':
-              'application/json',
-          },
-          body: JSON.stringify({
-            customerName:
-              customerName.trim(),
-
-            customerPhone:
-              customerPhone.trim(),
-
-            customerDocument: '',
-
-            orderType,
-
-            deliveryZone:
-              orderType === 'Delivery'
-                ? deliveryZone
-                : '',
-
-            deliveryAddress:
-              orderType === 'Delivery'
-                ? deliveryAddress.trim()
-                : '',
-
-            items: cart,
-
-            total:
-              parseFloat(totalPrice),
-
-            totalBs:
-              parseFloat(totalBs),
-
-            exchangeRate,
-
-            paymentMethod,
-
-            created_at:
-              new Date().toISOString(),
-          }),
-        }
-      );
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customerName: customerName.trim(),
+          customerPhone: customerPhone.trim(),
+          customerDocument: '',
+          orderType,
+          deliveryZone: orderType === 'Delivery' ? deliveryZone : '',
+          deliveryAddress:
+            orderType === 'Delivery' ? deliveryAddress.trim() : '',
+          items: cart,
+          total: parseFloat(totalPrice),
+          totalBs: parseFloat(totalBs),
+          exchangeRate,
+          paymentMethod,
+          created_at: new Date().toISOString(),
+        }),
+      });
 
       const data = await response.json();
 
@@ -314,627 +248,739 @@ export default function ClientMenu({
             'Error al registrar el pedido.'
         );
       }
+    } catch (error: unknown) {
+      console.error('Error al registrar pedido:', error);
 
-      console.log(
-        'Pedido web registrado:',
-        data
-      );
-    } catch (error: any) {
-      console.error(
-        'Error al registrar pedido:',
-        error
-      );
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'Error desconocido.';
 
       alert(
-        'Hubo un problema al registrar el pedido: ' +
-          (error?.message ||
-            'Error desconocido.')
+        'Hubo un problema al registrar el pedido: ' + errorMessage
       );
 
       setIsSubmitting(false);
       return;
-    } finally {
-      setIsSubmitting(false);
     }
 
-    // ========================================================
-    // WHATSAPP
-    // ========================================================
+    setIsSubmitting(false);
 
-    const phone =
-      '584143065287';
+    // Número actualizado: 0412-9269308
+    // Formato internacional de Venezuela para WhatsApp.
+    const phone = '584129269308';
 
-    let message =
-      `🍣 *NUEVO PEDIDO - TAKOSUSHI* 🍣\n\n`;
+    let message = '🍣 *NUEVO PEDIDO - TAKO TAKO* 🍣\n\n';
 
-    message += `👤 *Cliente:* ${customerName}\n`;
-    message += `📞 *Teléfono:* ${customerPhone}\n`;
+    message += `👤 *Cliente:* ${customerName.trim()}\n`;
+    message += `📞 *Teléfono:* ${customerPhone.trim()}\n`;
 
     message += `📍 *Servicio:* ${orderType}${
-      orderType === 'Delivery'
-        ? ` (${deliveryZone})`
-        : ''
+      orderType === 'Delivery' ? ` (${deliveryZone})` : ''
     }\n`;
 
     if (orderType === 'Delivery') {
-      message += `🏠 *Dirección:* ${deliveryAddress}\n`;
+      message += `🏠 *Dirección:* ${deliveryAddress.trim()}\n`;
     }
 
     message += `💳 *Pago:* ${paymentMethod}\n`;
-    message +=
-      `-----------------------------------\n`;
+    message += '-----------------------------------\n';
 
     cart.forEach((item) => {
-      message += `• ${item.quantity}x ${
-        item.name
-      } ($${(
-        item.price *
-        item.quantity
+      message += `• ${item.quantity}x ${item.name} ($${(
+        item.price * item.quantity
       ).toFixed(2)})\n`;
     });
 
-    message +=
-      `-----------------------------------\n`;
+    message += '-----------------------------------\n';
 
     if (orderType === 'Delivery') {
-      message += `🛵 *Delivery:* $${deliveryCost.toFixed(
-        2
-      )}\n`;
+      message += `🛵 *Delivery:* $${deliveryCost.toFixed(2)}\n`;
     }
 
     message += `💵 *TOTAL USD:* $${totalPrice}\n`;
-
     message += `🇻🇪 *TOTAL BS (Tasa ${exchangeRate.toFixed(
       2
     )}):* Bs. ${totalBs}`;
 
     const encodedURL =
-      `https://wa.me/${phone}?text=` +
-      encodeURIComponent(message);
+      `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 
-    window.open(
-      encodedURL,
-      '_blank'
-    );
+    window.open(encodedURL, '_blank', 'noopener,noreferrer');
   };
 
+  // ============================================================
+  // INTERFAZ
+  // ============================================================
+
   return (
-    <div className="flex flex-col min-h-screen justify-between w-full">
-      {/* HEADER */}
-      <header className="border-b border-pink-900/40 px-6 py-4 flex justify-between items-center bg-[#1a0008]/90 backdrop-blur-md sticky top-0 z-40">
-        <div className="flex items-center gap-3">
-          <div className="bg-[#ff007f] text-white font-black px-3 py-1.5 rounded-xl text-md shadow-lg shadow-[#ff007f]/30">
-            🍣 TAKO TAKO
-          </div>
+    <div className="min-h-screen w-full bg-[#10090d] text-white">
+      {/* ENCABEZADO */}
+      <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#10090d]/95 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+          <Link href="/" className="flex min-w-0 items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e91e75] text-xl shadow-lg shadow-pink-900/20">
+              🍣
+            </div>
 
-          <span className="text-xs uppercase tracking-widest text-pink-400 font-semibold hidden sm:inline">
-            Guarenas - Guatire
-          </span>
-
-          <span className="text-[10px] sm:text-xs text-emerald-400 font-bold">
-            {isLoadingExchangeRate
-              ? 'Actualizando tasa...'
-              : `BCV: Bs. ${exchangeRate.toFixed(
-                  2
-                )} / $1`}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Link
-            href="/login"
-            className="text-xs font-semibold text-pink-300 hover:text-white border border-pink-900 bg-pink-950/60 px-3 py-1.5 rounded-xl transition"
-          >
-            🔐 Sistema POS
+            <div className="min-w-0">
+              <p className="truncate text-base font-black tracking-wide text-white sm:text-lg">
+                TAKO <span className="text-[#f05a98]">TAKO</span>
+              </p>
+              <p className="text-[10px] font-medium tracking-[0.14em] text-white/45 sm:text-xs">
+                SUSHI · GUARENAS · GUATIRE
+              </p>
+            </div>
           </Link>
 
-          <button
-            onClick={() =>
-              setIsCartOpen(true)
-            }
-            className="bg-pink-950 border border-pink-800 text-pink-200 px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-2 hover:bg-pink-900 transition"
-          >
-            🛒 Carrito ({totalItems})
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <div className="hidden rounded-xl border border-emerald-500/20 bg-emerald-500/[0.07] px-3 py-2 sm:block">
+              <p className="text-[9px] font-semibold uppercase tracking-wider text-emerald-400/70">
+                Tasa de cambio
+              </p>
+              <p className="text-xs font-bold text-emerald-300">
+                {isLoadingExchangeRate
+                  ? 'Actualizando...'
+                  : `Bs. ${exchangeRate.toFixed(2)} / $1`}
+              </p>
+            </div>
+
+            <Link
+              href="/login"
+              className="hidden rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold text-white/65 transition hover:border-white/20 hover:text-white sm:inline-flex"
+            >
+              Sistema POS
+            </Link>
+
+            <button
+              onClick={() => setIsCartOpen(true)}
+              className="relative flex items-center gap-2 rounded-xl bg-[#e91e75] px-3 py-2.5 text-xs font-bold text-white transition hover:bg-[#d81768] sm:px-4"
+            >
+              <span>🛒</span>
+              <span className="hidden sm:inline">Mi pedido</span>
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 text-[10px] font-black text-[#c3165d]">
+                {totalItems}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div className="border-t border-white/[0.05] px-4 py-2 text-center sm:hidden">
+          <p className="text-[10px] text-emerald-300/80">
+            {isLoadingExchangeRate
+              ? 'Actualizando tasa de cambio...'
+              : `Tasa de referencia: Bs. ${exchangeRate.toFixed(2)} por dólar`}
+          </p>
         </div>
       </header>
 
-      {/* CONTENIDO */}
-      <main className="max-w-5xl mx-auto px-4 py-8 w-full flex-1">
-        <div className="text-center mb-10">
-          <span className="bg-[#ff007f]/20 text-pink-300 border border-[#ff007f]/40 text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-widest">
-            ✨ Menú Digital en Vivo
-          </span>
+      {/* CONTENIDO PRINCIPAL */}
+      <main className="mx-auto max-w-7xl px-4 pb-32 pt-8 sm:px-6 sm:pt-12 lg:px-8">
+        {/* PRESENTACIÓN */}
+        <section className="mb-8">
+          <div className="max-w-2xl">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#e91e75]/20 bg-[#e91e75]/[0.08] px-3 py-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-pink-200/80">
+                Nuestro menú
+              </span>
+            </div>
 
-          <h1 className="text-3xl sm:text-5xl font-black tracking-wider uppercase mt-3 mb-2 text-yellow-400 drop-shadow-md">
-            Nuestros Combos y Rolls
-          </h1>
+            <h1 className="text-3xl font-black leading-tight tracking-tight text-white sm:text-5xl">
+              Pide tus <span className="text-[#f05a98]">favoritos.</span>
+            </h1>
 
-          <p className="text-pink-200/80 text-xs sm:text-sm max-w-md mx-auto">
-            Pide directo a tu casa en Guarenas y Guatire o ven a retirar.
-          </p>
-        </div>
-
-        {initialCategories.length ===
-        0 ? (
-          <div className="text-center py-20 text-pink-300/60">
-            <p className="text-xl">
-              Cargando menú desde el sistema...
+            <p className="mt-3 max-w-lg text-sm leading-6 text-white/50 sm:text-base">
+              Descubre nuestros sabores, elige tu combinación favorita y
+              disfruta TAKO TAKO en casa o en nuestro local.
             </p>
           </div>
-        ) : (
-          initialCategories.map(
-            (cat, idx) => (
-              <div
-                key={idx}
-                className="mb-12"
+
+          <div className="mt-6 grid grid-cols-3 gap-2 sm:mt-8 sm:gap-3">
+            <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] px-3 py-3 sm:px-4">
+              <p className="text-lg sm:text-xl">🍣</p>
+              <p className="mt-1 text-[11px] font-semibold text-white/85 sm:text-sm">
+                Hecho al momento
+              </p>
+              <p className="mt-1 hidden text-[10px] text-white/40 sm:block">
+                Preparado para ti
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] px-3 py-3 sm:px-4">
+              <p className="text-lg sm:text-xl">🛵</p>
+              <p className="mt-1 text-[11px] font-semibold text-white/85 sm:text-sm">
+                Delivery
+              </p>
+              <p className="mt-1 hidden text-[10px] text-white/40 sm:block">
+                Guarenas y Guatire
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] px-3 py-3 sm:px-4">
+              <p className="text-lg sm:text-xl">💳</p>
+              <p className="mt-1 text-[11px] font-semibold text-white/85 sm:text-sm">
+                Fácil de pedir
+              </p>
+              <p className="mt-1 hidden text-[10px] text-white/40 sm:block">
+                Pedido por WhatsApp
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* BUSCADOR */}
+        <section className="mb-5">
+          <label htmlFor="menu-search" className="sr-only">
+            Buscar productos
+          </label>
+
+          <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 transition focus-within:border-[#e91e75]/50">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              className="h-5 w-5 shrink-0 text-white/35"
+            >
+              <circle
+                cx="11"
+                cy="11"
+                r="7"
+                stroke="currentColor"
+                strokeWidth="1.7"
+              />
+              <path
+                d="m16 16 4 4"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+              />
+            </svg>
+
+            <input
+              id="menu-search"
+              type="search"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="¿Qué se te antoja hoy?"
+              className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/30"
+            />
+
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="text-xs text-white/50 hover:text-white"
+                aria-label="Limpiar búsqueda"
               >
-                <div className="bg-[#ff007f] text-white font-black text-lg sm:text-xl py-2.5 px-5 rounded-2xl mb-6 shadow-lg uppercase tracking-wider transform -rotate-1">
-                  {cat.category}
+                Limpiar
+              </button>
+            )}
+          </div>
+        </section>
+
+        {/* CATEGORÍAS */}
+        <nav
+          aria-label="Categorías del menú"
+          className="mb-8 flex gap-2 overflow-x-auto pb-2"
+        >
+          {categories.map((category, index) => (
+            <button
+              key={`${category}-${index}`}
+              onClick={() => setSelectedCategory(category)}
+              className={`shrink-0 rounded-xl border px-4 py-2.5 text-xs font-semibold transition sm:text-sm ${
+                selectedCategory === category
+                  ? 'border-[#e91e75] bg-[#e91e75] text-white shadow-md shadow-pink-950/20'
+                  : 'border-white/10 bg-white/[0.025] text-white/55 hover:border-white/20 hover:text-white'
+              }`}
+            >
+              {category}
+            </button>
+          ))}
+        </nav>
+
+        {/* PRODUCTOS */}
+        {initialCategories.length === 0 ? (
+          <div className="rounded-3xl border border-white/10 bg-white/[0.025] px-5 py-20 text-center">
+            <p className="text-4xl">🍣</p>
+            <h2 className="mt-4 text-lg font-bold text-white">
+              Nuestro menú se está preparando
+            </h2>
+            <p className="mt-2 text-sm text-white/45">
+              Intenta nuevamente en unos momentos.
+            </p>
+          </div>
+        ) : visibleCategories.length === 0 ? (
+          <div className="rounded-3xl border border-white/10 bg-white/[0.025] px-5 py-16 text-center">
+            <p className="text-3xl">🔎</p>
+            <p className="mt-3 font-semibold text-white">
+              No encontramos productos
+            </p>
+            <p className="mt-1 text-sm text-white/45">
+              Prueba con otro nombre o selecciona otra categoría.
+            </p>
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setSelectedCategory('Todos');
+              }}
+              className="mt-5 rounded-xl bg-[#e91e75] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#d81768]"
+            >
+              Ver todo el menú
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-10 sm:space-y-12">
+            {visibleCategories.map((cat) => (
+              <section key={cat.category}>
+                <div className="mb-4 flex items-end justify-between gap-3">
+                  <div>
+                    <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-[#f05a98]">
+                      Descubre nuestros sabores
+                    </p>
+                    <h2 className="text-xl font-extrabold tracking-tight text-white sm:text-2xl">
+                      {cat.category}
+                    </h2>
+                  </div>
+
+                  <span className="shrink-0 pb-1 text-[10px] text-white/35 sm:text-xs">
+                    {cat.items.length}{' '}
+                    {cat.items.length === 1 ? 'producto' : 'productos'}
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {cat.items.map(
-                    (
-                      product: MenuItem
-                    ) => {
-                      const imageUrl =
-                        typeof product.image ===
-                        'string'
-                          ? product.image.trim()
-                          : '';
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
+                  {cat.items.map((product) => {
+                    const imageUrl =
+                      typeof product.image === 'string'
+                        ? product.image.trim()
+                        : '';
 
-                      return (
-                        <div
-                          key={product.id}
-                          className="bg-[#1f030d] border border-pink-900/50 rounded-3xl overflow-hidden flex flex-col shadow-xl"
-                        >
-                          {/* IMAGEN */}
-                          <div className="w-full h-48 sm:h-56 bg-black/50 relative overflow-hidden border-b border-pink-900/40 flex-shrink-0">
-                            {imageUrl &&
-                            imageUrl !==
-                              'NULL' &&
-                            imageUrl !==
-                              'EMPTY_STRING' ? (
-                              <img
-                                src={imageUrl}
-                                alt={
-                                  product.name
-                                }
-                                className="w-full h-full object-cover hover:scale-105 transition duration-500"
-                                onError={(
-                                  e
-                                ) => {
-                                  e.currentTarget.style.display =
-                                    'none';
+                    const hasImage =
+                      imageUrl !== '' &&
+                      imageUrl.toUpperCase() !== 'NULL' &&
+                      imageUrl !== 'EMPTY_STRING';
 
-                                  const parent =
-                                    e
-                                      .currentTarget
-                                      .parentElement;
-
-                                  if (
-                                    parent
-                                  ) {
-                                    parent.innerHTML = `
-                                      <div class="w-full h-full bg-[#140005] flex items-center justify-center text-pink-500/40 text-xs font-medium tracking-widest uppercase">
-                                        📷 Sin imagen disponible
-                                      </div>
-                                    `;
-                                  }
-                                }}
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-[#140005] flex items-center justify-center text-pink-500/40 text-xs font-medium tracking-widest uppercase">
-                                📷 Sin imagen disponible
-                              </div>
-                            )}
+                    return (
+                      <article
+                        key={product.id}
+                        className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#191116] transition duration-300 hover:-translate-y-0.5 hover:border-[#e91e75]/40 hover:shadow-xl hover:shadow-black/20"
+                      >
+                        {/* FOTOGRAFÍA */}
+                        <div className="relative aspect-[16/10] overflow-hidden bg-[#21151c]">
+                          <div className="absolute inset-0 flex items-center justify-center text-4xl opacity-30">
+                            🍣
                           </div>
 
-                          {/* CONTENIDO */}
-                          <div className="p-5 flex-1 flex flex-col justify-between gap-4">
-                            <div>
-                              <h3 className="text-yellow-400 font-extrabold text-base sm:text-lg uppercase tracking-wide mb-1.5">
-                                {product.name}
-                              </h3>
+                          {hasImage && (
+                            <img
+                              src={imageUrl}
+                              alt={product.name}
+                              loading="lazy"
+                              className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          )}
 
-                              <p className="text-pink-100/70 text-xs sm:text-sm leading-relaxed">
-                                {product.description ||
-                                  'Delicioso plato preparado al momento con los mejores ingredientes.'}
-                              </p>
-                            </div>
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
 
-                            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-pink-950 mt-auto">
-                              <span className="bg-white text-slate-950 font-black px-3 py-1.5 rounded-xl text-base shadow-inner">
-                                $
-                                {product.price.toFixed(
-                                  2
-                                )}
-                              </span>
-
-                              <button
-                                onClick={() =>
-                                  addToCart(
-                                    product
-                                  )
-                                }
-                                className="bg-[#ff007f] hover:bg-pink-600 text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-[#ff007f]/30 transition active:scale-95 flex items-center gap-1.5"
-                              >
-                                <span>
-                                  + Agregar al Carrito
-                                </span>
-                              </button>
-                            </div>
+                          <div className="absolute bottom-3 left-3 rounded-lg border border-white/15 bg-black/55 px-2.5 py-1.5 backdrop-blur-md">
+                            <span className="text-sm font-extrabold text-white">
+                              ${Number(product.price || 0).toFixed(2)}
+                            </span>
                           </div>
                         </div>
-                      );
-                    }
-                  )}
+
+                        {/* INFORMACIÓN */}
+                        <div className="flex flex-1 flex-col p-4 sm:p-5">
+                          <h3 className="text-sm font-bold leading-snug text-white sm:text-base">
+                            {product.name}
+                          </h3>
+
+                          <p className="mt-2 line-clamp-2 min-h-[2.5rem] text-xs leading-5 text-white/45">
+                            {product.description ||
+                              'Una deliciosa opción preparada con el sabor de TAKO TAKO.'}
+                          </p>
+
+                          <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/[0.07] pt-3">
+                            <span className="text-[10px] font-medium text-white/35">
+                              Precio en USD
+                            </span>
+
+                            <button
+                              onClick={() => addToCart(product)}
+                              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#e91e75] px-3.5 py-2.5 text-xs font-bold text-white transition hover:bg-[#d81768] active:scale-[0.97]"
+                            >
+                              <span className="text-base leading-none">+</span>
+                              Agregar
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
-              </div>
-            )
-          )
+              </section>
+            ))}
+          </div>
         )}
       </main>
 
-      {/* BARRA DEL CARRITO */}
-      {totalItems > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-[#1a0008]/95 border-t border-pink-900/60 p-4 backdrop-blur-lg z-40 flex justify-between items-center max-w-xl mx-auto sm:rounded-t-3xl shadow-2xl">
-          <div>
-            <p className="text-xs text-pink-300">
-              {totalItems}{' '}
-              {totalItems === 1
-                ? 'producto'
-                : 'productos'}
-            </p>
+      {/* BARRA INFERIOR DEL PEDIDO */}
+      {totalItems > 0 && !isCartOpen && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-[#10090d]/95 p-3 pb-[max(12px,env(safe-area-inset-bottom))] backdrop-blur-xl sm:px-6 sm:py-4">
+          <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[10px] text-white/45 sm:text-xs">
+                {totalItems} {totalItems === 1 ? 'producto' : 'productos'}
+              </p>
+              <p className="text-lg font-black text-white sm:text-xl">
+                ${totalPrice}
+              </p>
+            </div>
 
-            <p className="text-lg font-black text-yellow-400">
-              ${totalPrice}
-            </p>
+            <button
+              onClick={() => setIsCartOpen(true)}
+              className="flex items-center justify-center gap-2 rounded-xl bg-[#e91e75] px-5 py-3 text-xs font-bold text-white shadow-lg shadow-pink-950/25 transition hover:bg-[#d81768] sm:px-6 sm:text-sm"
+            >
+              Revisar pedido
+              <span>→</span>
+            </button>
           </div>
-
-          <button
-            onClick={() =>
-              setIsCartOpen(true)
-            }
-            className="bg-[#ff007f] hover:bg-pink-600 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg shadow-[#ff007f]/40 transition flex items-center gap-2"
-          >
-            🛒 Ver Pedido y Pagar
-          </button>
         </div>
       )}
 
-      {/* CARRITO */}
+      {/* PANEL DEL CARRITO */}
       {isCartOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex justify-end">
-          <div className="bg-[#1c020b] w-full max-w-md h-full p-6 flex flex-col justify-between border-l border-pink-900/50 shadow-2xl overflow-y-auto">
-            <div>
-              <div className="flex justify-between items-center pb-4 border-b border-pink-900/50 mb-4">
-                <h2 className="text-lg font-black text-yellow-400">
-                  🛒 Tu Pedido
-                </h2>
-
-                <button
-                  onClick={() =>
-                    setIsCartOpen(false)
-                  }
-                  className="bg-pink-950 text-pink-300 hover:text-white font-bold text-xs px-3 py-1.5 rounded-xl border border-pink-900"
+        <div
+          className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-sm"
+          onClick={() => setIsCartOpen(false)}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cart-title"
+            className="flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-white/10 bg-[#151015] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* CABECERA DEL CARRITO */}
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.08] bg-[#151015]/95 px-5 py-4 backdrop-blur-xl">
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#f05a98]">
+                  TAKO TAKO
+                </p>
+                <h2
+                  id="cart-title"
+                  className="mt-1 text-lg font-extrabold text-white"
                 >
-                  ✕ Cerrar
-                </button>
+                  Tu pedido
+                </h2>
               </div>
 
-              {cart.length === 0 ? (
-                <div className="text-center py-10 text-pink-300/60">
-                  <p className="text-4xl mb-3">
-                    🍣
-                  </p>
+              <button
+                onClick={() => setIsCartOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 text-white/60 transition hover:bg-white/5 hover:text-white"
+                aria-label="Cerrar carrito"
+              >
+                ✕
+              </button>
+            </div>
 
-                  <p className="text-sm">
-                    Tu carrito está vacío.
+            {/* PRODUCTOS DEL CARRITO */}
+            <div className="flex-1 px-5 py-5">
+              {cart.length === 0 ? (
+                <div className="py-14 text-center">
+                  <p className="text-4xl">🛒</p>
+                  <p className="mt-4 font-semibold text-white">
+                    Tu carrito está vacío
                   </p>
+                  <p className="mt-2 text-xs text-white/40">
+                    Agrega tus favoritos para comenzar.
+                  </p>
+                  <button
+                    onClick={() => setIsCartOpen(false)}
+                    className="mt-5 rounded-xl bg-[#e91e75] px-4 py-2.5 text-xs font-bold text-white"
+                  >
+                    Explorar menú
+                  </button>
                 </div>
               ) : (
-                <div className="space-y-3 max-h-[30vh] overflow-y-auto pr-1 mb-4">
-                  {cart.map(
-                    (item) => (
-                      <div
-                        key={item.id}
-                        className="bg-[#140005] p-3 rounded-2xl border border-pink-950 flex justify-between items-center"
-                      >
-                        <div>
-                          <h4 className="font-bold text-xs text-yellow-200">
-                            {item.name}
-                          </h4>
-
-                          <p className="text-[11px] text-pink-400">
-                            $
-                            {item.price.toFixed(
-                              2
-                            )}{' '}
-                            c/u
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() =>
-                              updateQuantity(
-                                item.id,
-                                -1
-                              )
-                            }
-                            className="bg-pink-950 w-7 h-7 rounded-lg font-bold text-xs hover:bg-pink-900 flex items-center justify-center"
-                          >
-                            -
-                          </button>
-
-                          <span className="font-bold text-xs w-4 text-center">
-                            {item.quantity}
-                          </span>
-
-                          <button
-                            onClick={() =>
-                              updateQuantity(
-                                item.id,
-                                1
-                              )
-                            }
-                            className="bg-pink-950 w-7 h-7 rounded-lg font-bold text-xs hover:bg-pink-900 flex items-center justify-center"
-                          >
-                            +
-                          </button>
-                        </div>
+                <div className="space-y-3">
+                  {cart.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-xs font-bold leading-5 text-white">
+                          {item.name}
+                        </h3>
+                        <p className="mt-1 text-[11px] text-white/40">
+                          ${item.price.toFixed(2)} por unidad
+                        </p>
+                        <p className="mt-1 text-xs font-bold text-[#f05a98]">
+                          ${(item.price * item.quantity).toFixed(2)}
+                        </p>
                       </div>
-                    )
+
+                      <div className="flex shrink-0 items-center gap-3">
+                        <button
+                          onClick={() => updateQuantity(item.id, -1)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-sm text-white transition hover:bg-white/10"
+                          aria-label={`Quitar una unidad de ${item.name}`}
+                        >
+                          −
+                        </button>
+
+                        <span className="w-4 text-center text-xs font-bold text-white">
+                          {item.quantity}
+                        </span>
+
+                        <button
+                          onClick={() => updateQuantity(item.id, 1)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#e91e75] text-sm font-bold text-white transition hover:bg-[#d81768]"
+                          aria-label={`Agregar una unidad de ${item.name}`}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* DATOS DEL CLIENTE */}
+              {cart.length > 0 && (
+                <div className="mt-7 space-y-5">
+                  <div>
+                    <h3 className="mb-3 text-sm font-bold text-white">
+                      Datos de contacto
+                    </h3>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label
+                          htmlFor="customer-name"
+                          className="mb-1.5 block text-[11px] font-medium text-white/55"
+                        >
+                          Nombre completo
+                        </label>
+                        <input
+                          id="customer-name"
+                          type="text"
+                          autoComplete="name"
+                          placeholder="Ej. Carlos Pérez"
+                          value={customerName}
+                          onChange={(e) =>
+                            setCustomerName(e.target.value)
+                          }
+                          className="w-full rounded-xl border border-white/10 bg-white/[0.035] px-3.5 py-3 text-xs text-white outline-none transition placeholder:text-white/25 focus:border-[#e91e75]/60"
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="customer-phone"
+                          className="mb-1.5 block text-[11px] font-medium text-white/55"
+                        >
+                          Teléfono de contacto
+                        </label>
+                        <input
+                          id="customer-phone"
+                          type="tel"
+                          autoComplete="tel"
+                          placeholder="0412-0000000"
+                          value={customerPhone}
+                          onChange={(e) =>
+                            setCustomerPhone(e.target.value)
+                          }
+                          className="w-full rounded-xl border border-white/10 bg-white/[0.035] px-3.5 py-3 text-xs text-white outline-none transition placeholder:text-white/25 focus:border-[#e91e75]/60"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* TIPO DE SERVICIO */}
+                  <div>
+                    <label
+                      htmlFor="order-type"
+                      className="mb-2 block text-[11px] font-medium text-white/55"
+                    >
+                      ¿Cómo deseas recibir tu pedido?
+                    </label>
+
+                    <select
+                      id="order-type"
+                      value={orderType}
+                      onChange={(e) => setOrderType(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-[#211820] px-3.5 py-3 text-xs text-white outline-none focus:border-[#e91e75]/60"
+                    >
+                      <option value="Local / Mesa">
+                        Comer en el local
+                      </option>
+                      <option value="Pickup">
+                        Retirar en el local
+                      </option>
+                      <option value="Delivery">
+                        Delivery a domicilio
+                      </option>
+                    </select>
+                  </div>
+
+                  {/* DATOS DE DELIVERY */}
+                  {orderType === 'Delivery' && (
+                    <div className="space-y-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4">
+                      <div>
+                        <label
+                          htmlFor="delivery-zone"
+                          className="mb-1.5 block text-[11px] font-medium text-white/55"
+                        >
+                          Zona de entrega
+                        </label>
+                        <select
+                          id="delivery-zone"
+                          value={deliveryZone}
+                          onChange={(e) =>
+                            setDeliveryZone(e.target.value)
+                          }
+                          className="w-full rounded-xl border border-white/10 bg-[#211820] px-3 py-2.5 text-xs text-white outline-none focus:border-[#e91e75]/60"
+                        >
+                          <option value="Guarenas">
+                            Guarenas — $2.00
+                          </option>
+                          <option value="Guatire">
+                            Guatire — $3.00
+                          </option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="delivery-address"
+                          className="mb-1.5 block text-[11px] font-medium text-white/55"
+                        >
+                          Dirección exacta
+                        </label>
+                        <textarea
+                          id="delivery-address"
+                          rows={3}
+                          placeholder="Urbanización, calle, casa y referencias..."
+                          value={deliveryAddress}
+                          onChange={(e) =>
+                            setDeliveryAddress(e.target.value)
+                          }
+                          className="w-full resize-y rounded-xl border border-white/10 bg-[#211820] px-3 py-2.5 text-xs text-white outline-none placeholder:text-white/25 focus:border-[#e91e75]/60"
+                        />
+                      </div>
+                    </div>
                   )}
+
+                  {/* MÉTODO DE PAGO */}
+                  <div>
+                    <label
+                      htmlFor="payment-method"
+                      className="mb-1.5 block text-[11px] font-medium text-white/55"
+                    >
+                      Método de pago
+                    </label>
+                    <select
+                      id="payment-method"
+                      value={paymentMethod}
+                      onChange={(e) =>
+                        setPaymentMethod(e.target.value)
+                      }
+                      className="w-full rounded-xl border border-white/10 bg-[#211820] px-3.5 py-3 text-xs text-white outline-none focus:border-[#e91e75]/60"
+                    >
+                      <option value="Efectivo / Divisas">
+                        Efectivo en divisas ($)
+                      </option>
+                      <option value="Pago Móvil (Bs)">
+                        Pago móvil (Bs)
+                      </option>
+                      <option value="Zelle / Binance">
+                        Zelle / Binance
+                      </option>
+                    </select>
+                  </div>
                 </div>
               )}
             </div>
 
+            {/* TOTALES Y CONFIRMACIÓN */}
             {cart.length > 0 && (
-              <div className="border-t border-pink-900/50 pt-4 space-y-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-pink-300 mb-1">
-                      Tu Nombre:
-                    </label>
-
-                    <input
-                      type="text"
-                      placeholder="Ej. Carlos Pérez"
-                      value={
-                        customerName
-                      }
-                      onChange={(e) =>
-                        setCustomerName(
-                          e.target.value
-                        )
-                      }
-                      className="w-full bg-[#140005] border border-pink-900 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ff007f]"
-                    />
+              <div className="border-t border-white/[0.08] bg-[#10090d] px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-4">
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between text-white/50">
+                    <span>Subtotal</span>
+                    <span>${subtotalPrice.toFixed(2)}</span>
                   </div>
 
-                  <div>
-                    <label className="block text-[10px] font-semibold text-pink-300 mb-1">
-                      Teléfono:
-                    </label>
-
-                    <input
-                      type="text"
-                      placeholder="0412-0000000"
-                      value={
-                        customerPhone
-                      }
-                      onChange={(e) =>
-                        setCustomerPhone(
-                          e.target.value
-                        )
-                      }
-                      className="w-full bg-[#140005] border border-pink-900 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ff007f]"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-semibold text-pink-300 mb-1">
-                    Tipo de Servicio:
-                  </label>
-
-                  <select
-                    value={orderType}
-                    onChange={(e) =>
-                      setOrderType(
-                        e.target.value
-                      )
-                    }
-                    className="w-full bg-[#140005] border border-pink-900 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ff007f]"
-                  >
-                    <option value="Local / Mesa">
-                      🍽️ Comer en Local / Mesa
-                    </option>
-
-                    <option value="Pickup">
-                      🏃‍♂️ Retirar en Local (Pickup)
-                    </option>
-
-                    <option value="Delivery">
-                      🛵 Delivery a Domicilio
-                    </option>
-                  </select>
-                </div>
-
-                {orderType ===
-                  'Delivery' && (
-                  <div className="space-y-2 bg-[#140005] p-3 rounded-xl border border-pink-950">
-                    <div>
-                      <label className="block text-[10px] font-semibold text-pink-300 mb-1">
-                        Zona de Delivery:
-                      </label>
-
-                      <select
-                        value={
-                          deliveryZone
-                        }
-                        onChange={(e) =>
-                          setDeliveryZone(
-                            e.target.value
-                          )
-                        }
-                        className="w-full bg-[#1a0008] border border-pink-900 rounded-lg px-2 py-1.5 text-xs text-white"
-                      >
-                        <option value="Guarenas">
-                          Guarenas ($2.00)
-                        </option>
-
-                        <option value="Guatire">
-                          Guatire ($3.00)
-                        </option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-semibold text-pink-300 mb-1">
-                        Dirección Exacta:
-                      </label>
-
-                      <input
-                        type="text"
-                        placeholder="Ej. Urb. Trapichito..."
-                        value={
-                          deliveryAddress
-                        }
-                        onChange={(e) =>
-                          setDeliveryAddress(
-                            e.target.value
-                          )
-                        }
-                        className="w-full bg-[#1a0008] border border-pink-900 rounded-lg px-2 py-1.5 text-xs text-white"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-[10px] font-semibold text-pink-300 mb-1">
-                    Método de Pago:
-                  </label>
-
-                  <select
-                    value={
-                      paymentMethod
-                    }
-                    onChange={(e) =>
-                      setPaymentMethod(
-                        e.target.value
-                      )
-                    }
-                    className="w-full bg-[#140005] border border-pink-900 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ff007f]"
-                  >
-                    <option value="Efectivo / Divisas">
-                      💵 Efectivo Divisas ($)
-                    </option>
-
-                    <option value="Pago Móvil (Bs)">
-                      📱 Pago Móvil (Bolívares)
-                    </option>
-
-                    <option value="Zelle / Binance">
-                      🌐 Zelle / Binance
-                    </option>
-                  </select>
-                </div>
-
-                <div className="bg-[#140005] p-3 rounded-xl border border-pink-950 space-y-1 text-xs">
-                  <div className="flex justify-between text-pink-300/80">
-                    <span>
-                      Subtotal:
-                    </span>
-
-                    <span>
-                      $
-                      {subtotalPrice.toFixed(
-                        2
-                      )}
-                    </span>
-                  </div>
-
-                  {orderType ===
-                    'Delivery' && (
-                    <div className="flex justify-between text-pink-300/80">
-                      <span>
-                        Delivery (
-                        {deliveryZone}
-                        ):
-                      </span>
-
-                      <span>
-                        $
-                        {deliveryCost.toFixed(
-                          2
-                        )}
-                      </span>
+                  {orderType === 'Delivery' && (
+                    <div className="flex justify-between text-white/50">
+                      <span>Delivery · {deliveryZone}</span>
+                      <span>${deliveryCost.toFixed(2)}</span>
                     </div>
                   )}
 
-                  <div className="flex justify-between font-black text-sm text-yellow-400 pt-2 border-t border-pink-900/40">
-                    <span>
-                      Total USD:
+                  <div className="flex items-center justify-between border-t border-white/[0.08] pt-3">
+                    <span className="font-semibold text-white">
+                      Total a pagar
                     </span>
-
-                    <span>
+                    <span className="text-xl font-black text-white">
                       ${totalPrice}
                     </span>
                   </div>
 
-                  <div className="flex justify-between font-bold text-pink-200">
+                  <div className="flex justify-between text-[11px] text-emerald-300/80">
                     <span>
-                      Total Bolívares (
+                      Equivalente en bolívares
                       {isLoadingExchangeRate
-                        ? 'Actualizando tasa...'
-                        : `Tasa ${exchangeRate.toFixed(
-                            2
-                          )}`}
-                      ):
+                        ? ' · Actualizando tasa'
+                        : ` · Tasa ${exchangeRate.toFixed(2)}`}
                     </span>
-
-                    <span>
-                      Bs.{' '}
-                      {isLoadingExchangeRate
-                        ? '...'
-                        : totalBs}
+                    <span className="font-bold">
+                      Bs. {isLoadingExchangeRate ? '...' : totalBs}
                     </span>
                   </div>
                 </div>
 
                 <button
-                  onClick={
-                    checkoutWhatsApp
-                  }
-                  disabled={
-                    isSubmitting ||
-                    isLoadingExchangeRate
-                  }
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white py-3 rounded-xl font-extrabold text-sm shadow-xl shadow-emerald-600/30 transition flex items-center justify-center gap-2"
+                  onClick={checkoutWhatsApp}
+                  disabled={isSubmitting || isLoadingExchangeRate}
+                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isSubmitting
-                    ? 'Registrando...'
+                    ? 'Registrando pedido...'
                     : isLoadingExchangeRate
                     ? 'Actualizando tasa...'
-                    : '🟢 Enviar Pedido por WhatsApp'}
+                    : 'Enviar pedido por WhatsApp'}
+                  {!isSubmitting && !isLoadingExchangeRate && (
+                    <span>↗</span>
+                  )}
                 </button>
+
+                <p className="mt-3 text-center text-[10px] leading-4 text-white/30">
+                  Tu pedido se registrará antes de abrir WhatsApp para
+                  confirmar los detalles.
+                </p>
               </div>
             )}
-          </div>
+          </section>
         </div>
       )}
 
-      {/* FOOTER */}
-      <footer className="border-t border-pink-900/30 py-6 text-center text-xs text-pink-400/60 bg-[#1a0008] space-y-2">
-        <p>
-          Takosushi • Guarenas y Guatire.
+      {/* PIE DE PÁGINA */}
+      <footer className="border-t border-white/[0.07] px-4 py-7 text-center">
+        <p className="text-sm font-bold tracking-wide text-white/70">
+          TAKO <span className="text-[#f05a98]">TAKO</span>
+        </p>
+        <p className="mt-1 text-[10px] text-white/35">
+          Guarenas · Guatire · El sabor que disfrutas
         </p>
       </footer>
     </div>
   );
 }
+```
