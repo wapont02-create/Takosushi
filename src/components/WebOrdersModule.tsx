@@ -1,6 +1,7 @@
+```tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 interface WebOrderItem {
   product_id: number;
@@ -17,22 +18,17 @@ interface WebOrder {
   customer_name: string;
   customer_document: string;
   customer_phone: string;
-
   total_usd: number;
   total_ves: number;
   payment_method: string;
   created_at: string | null;
-
   cash_register_id: number | null;
   exchange_rate: number;
-
   status: string;
   source: string;
-
   order_type: string;
   delivery_zone: string;
   delivery_address: string;
-
   items: WebOrderItem[];
 }
 
@@ -47,462 +43,477 @@ export default function WebOrdersModule({
 }: WebOrdersModuleProps) {
   const [orders, setOrders] = useState<WebOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [processingId, setProcessingId] = useState<number | null>(null);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
 
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async (manual = false) => {
+    if (manual) {
+      setRefreshing(true);
+    }
+
     try {
-      const response = await fetch(
-        '/api/admin/orders?status=aprobado',
-        {
-          cache: 'no-store',
-        }
-      );
+      const [pendingResponse, approvedResponse] =
+        await Promise.all([
+          fetch('/api/admin/orders?status=pendiente', {
+            cache: 'no-store',
+          }),
+          fetch('/api/admin/orders?status=aprobado', {
+            cache: 'no-store',
+          }),
+        ]);
 
-      if (!response.ok) {
+      const [pendingData, approvedData] =
+        await Promise.all([
+          pendingResponse.json(),
+          approvedResponse.json(),
+        ]);
+
+      if (!pendingResponse.ok || !pendingData.success) {
         throw new Error(
-          `Error HTTP ${response.status}`
+          pendingData.message ||
+            'No se pudieron consultar los pedidos pendientes.'
         );
       }
 
-      const data = await response.json();
-
-      if (data?.success && Array.isArray(data.orders)) {
-        setOrders(data.orders);
-      } else {
-        setOrders([]);
+      if (!approvedResponse.ok || !approvedData.success) {
+        throw new Error(
+          approvedData.message ||
+            'No se pudieron consultar los pedidos aprobados.'
+        );
       }
-    } catch (error) {
-      console.error(
-        'Error cargando pedidos web aprobados:',
-        error
+
+      const pendingOrders: WebOrder[] =
+        Array.isArray(pendingData.orders)
+          ? pendingData.orders
+          : [];
+
+      const approvedOrders: WebOrder[] =
+        Array.isArray(approvedData.orders)
+          ? approvedData.orders
+          : [];
+
+      // Evita duplicados si un pedido cambia de estado
+      // mientras se realizan las dos consultas.
+      const uniqueOrders = new Map<number, WebOrder>();
+
+      for (const order of [
+        ...pendingOrders,
+        ...approvedOrders,
+      ]) {
+        uniqueOrders.set(Number(order.id), order);
+      }
+
+      setOrders(
+        Array.from(uniqueOrders.values()).sort(
+          (a, b) => {
+            const aPending = a.status === 'pendiente' ? 0 : 1;
+            const bPending = b.status === 'pendiente' ? 0 : 1;
+
+            if (aPending !== bPending) {
+              return aPending - bPending;
+            }
+
+            return Number(b.id) - Number(a.id);
+          }
+        )
       );
-      setOrders([]);
+
+      setError('');
+    } catch (err) {
+      console.error('Error cargando pedidos web:', err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudieron cargar los pedidos web.'
+      );
     } finally {
       setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadOrders();
+
+    const interval = setInterval(() => {
+      void loadOrders();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [loadOrders]);
+
+  const updateOrderStatus = async (
+    order: WebOrder,
+    status: 'aprobado' | 'cancelado'
+  ) => {
+    const action =
+      status === 'aprobado' ? 'aceptar' : 'rechazar';
+
+    if (processingId !== null) {
+      return;
+    }
+
+    if (status === 'cancelado') {
+      const confirmed = window.confirm(
+        `¿Deseas rechazar el pedido web #${order.id} de ${order.customer_name || 'este cliente'}?`
+      );
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    setProcessingId(order.id);
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch('/api/admin/orders', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: order.id,
+          status,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message || `No se pudo ${action} el pedido.`
+        );
+      }
+
+      setMessage(
+        status === 'aprobado'
+          ? `Pedido #${order.id} aceptado. Ya puedes cargarlo al POS.`
+          : `Pedido #${order.id} rechazado correctamente.`
+      );
+
+      await loadOrders();
+    } catch (err) {
+      console.error('Error actualizando pedido:', err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : `No se pudo ${action} el pedido.`
+      );
+    } finally {
+      setProcessingId(null);
     }
   };
 
-  useEffect(() => {
-    loadOrders();
+  const pendingOrders = orders.filter(
+    (order) => order.status === 'pendiente'
+  );
 
-    const interval = window.setInterval(() => {
-      loadOrders();
-    }, 10000);
+  const approvedOrders = orders.filter(
+    (order) => order.status === 'aprobado'
+  );
 
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, []);
+  const formatUSD = (value: number) =>
+    new Intl.NumberFormat('es-VE', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+    }).format(Number(value) || 0);
+
+  const formatVES = (value: number) =>
+    new Intl.NumberFormat('es-VE', {
+      style: 'currency',
+      currency: 'VES',
+      minimumFractionDigits: 2,
+    }).format(Number(value) || 0);
+
+  const formatDate = (value: string | null) => {
+    if (!value) {
+      return 'Fecha no disponible';
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+
+    return date.toLocaleString('es-VE', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    });
+  };
 
   if (loading) {
     return (
-      <div
-        style={{
-          marginBottom: '20px',
-          padding: '16px',
-          borderRadius: '12px',
-          background: '#f8fafc',
-          border: '1px solid #e2e8f0',
-        }}
-      >
-        <div
-          style={{
-            fontSize: '14px',
-            color: '#64748b',
-          }}
-        >
-          Cargando pedidos web aprobados...
-        </div>
-      </div>
+      <section className="mb-6 rounded-xl border border-gray-700 bg-gray-900 p-5 text-gray-300">
+        <p>Consultando pedidos web...</p>
+      </section>
     );
   }
 
-  if (orders.length === 0) {
-    return null;
-  }
-
   return (
-    <section
-      style={{
-        marginBottom: '24px',
-      }}
-    >
-      <div
-        style={{
-          marginBottom: '12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '12px',
-          flexWrap: 'wrap',
-        }}
-      >
+    <section className="mb-6 space-y-4 rounded-xl border border-gray-700 bg-gray-900 p-4 text-white sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2
-            style={{
-              margin: 0,
-              fontSize: '20px',
-              fontWeight: 700,
-            }}
-          >
-            Pedidos Web aprobados
+          <h2 className="text-xl font-bold">
+            Pedidos de la web
           </h2>
 
-          <p
-            style={{
-              margin: '4px 0 0',
-              fontSize: '13px',
-              color: '#64748b',
-            }}
-          >
-            Pedidos listos para cargar al POS y
-            facturar.
+          <p className="mt-1 text-sm text-gray-400">
+            Acepta o rechaza los pedidos desde la caja.
           </p>
         </div>
 
-        <div
-          style={{
-            padding: '6px 10px',
-            borderRadius: '999px',
-            background: '#dcfce7',
-            color: '#166534',
-            fontSize: '13px',
-            fontWeight: 600,
-          }}
+        <button
+          type="button"
+          onClick={() => void loadOrders(true)}
+          disabled={refreshing || processingId !== null}
+          className="rounded-lg border border-gray-600 px-3 py-2 text-sm font-medium transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {orders.length}{' '}
-          {orders.length === 1
-            ? 'pedido'
-            : 'pedidos'}
+          {refreshing ? 'Actualizando...' : '↻ Actualizar'}
+        </button>
+      </div>
+
+      {error && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-800 bg-red-950/50 p-3 text-sm text-red-300"
+        >
+          {error}
+        </div>
+      )}
+
+      {message && (
+        <div
+          role="status"
+          className="rounded-lg border border-green-800 bg-green-950/40 p-3 text-sm text-green-300"
+        >
+          {message}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-lg border border-amber-700/50 bg-amber-950/30 p-3">
+          <p className="text-sm text-amber-300">
+            Por revisar
+          </p>
+          <p className="mt-1 text-2xl font-bold">
+            {pendingOrders.length}
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-green-700/50 bg-green-950/30 p-3">
+          <p className="text-sm text-green-300">
+            Aprobados
+          </p>
+          <p className="mt-1 text-2xl font-bold">
+            {approvedOrders.length}
+          </p>
         </div>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns:
-            'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: '16px',
-        }}
-      >
-        {orders.map((order) => {
-          const isLoaded =
-            loadedOrderId === order.id;
+      {orders.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-gray-700 p-6 text-center">
+          <p className="font-medium text-gray-300">
+            No hay pedidos web pendientes ni aprobados.
+          </p>
+          <p className="mt-1 text-sm text-gray-500">
+            Los pedidos nuevos aparecerán aquí automáticamente.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {orders.map((order) => {
+            const isPending = order.status === 'pendiente';
+            const isApproved = order.status === 'aprobado';
+            const isProcessing = processingId === order.id;
+            const isLoaded = Number(loadedOrderId) === order.id;
 
-          return (
-            <article
-              key={order.id}
-              style={{
-                border: isLoaded
-                  ? '2px solid #16a34a'
-                  : '1px solid #e2e8f0',
-                borderRadius: '14px',
-                background: '#ffffff',
-                padding: '16px',
-                boxShadow:
-                  '0 4px 16px rgba(15, 23, 42, 0.06)',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent:
-                    'space-between',
-                  alignItems: 'flex-start',
-                  gap: '12px',
-                  marginBottom: '14px',
-                }}
+            return (
+              <article
+                key={order.id}
+                className="overflow-hidden rounded-xl border border-gray-700 bg-gray-950/70"
               >
-                <div>
-                  <div
-                    style={{
-                      fontSize: '18px',
-                      fontWeight: 700,
-                    }}
-                  >
-                    Pedido #{order.id}
-                  </div>
-
-                  <div
-                    style={{
-                      marginTop: '4px',
-                      fontSize: '13px',
-                      color: '#64748b',
-                    }}
-                  >
-                    {order.created_at
-                      ? new Date(
-                          order.created_at
-                        ).toLocaleString(
-                          'es-VE'
-                        )
-                      : 'Fecha no disponible'}
-                  </div>
-                </div>
-
-                <span
-                  style={{
-                    padding: '5px 9px',
-                    borderRadius: '999px',
-                    background:
-                      '#dcfce7',
-                    color: '#166534',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    whiteSpace:
-                      'nowrap',
-                  }}
-                >
-                  APROBADO
-                </span>
-              </div>
-
-              <div
-                style={{
-                  marginBottom: '14px',
-                  padding: '12px',
-                  borderRadius: '10px',
-                  background: '#f8fafc',
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: 600,
-                    marginBottom: '4px',
-                  }}
-                >
-                  {order.customer_name ||
-                    'Cliente sin nombre'}
-                </div>
-
-                {order.customer_phone && (
-                  <div
-                    style={{
-                      fontSize: '13px',
-                      color: '#475569',
-                    }}
-                  >
-                    Tel: {order.customer_phone}
-                  </div>
-                )}
-
-                {order.customer_document && (
-                  <div
-                    style={{
-                      fontSize: '13px',
-                      color: '#475569',
-                    }}
-                  >
-                    CI/RIF:{' '}
-                    {order.customer_document}
-                  </div>
-                )}
-              </div>
-
-              <div
-                style={{
-                  marginBottom: '14px',
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: '13px',
-                    color: '#64748b',
-                    marginBottom: '6px',
-                  }}
-                >
-                  Productos
-                </div>
-
-                {order.items.map(
-                  (item, index) => (
-                    <div
-                      key={`${order.id}-${item.product_id}-${index}`}
-                      style={{
-                        display: 'flex',
-                        justifyContent:
-                          'space-between',
-                        gap: '10px',
-                        padding:
-                          '6px 0',
-                        borderBottom:
-                          index <
-                          order.items
-                            .length -
-                            1
-                            ? '1px solid #e2e8f0'
-                            : 'none',
-                        fontSize: '13px',
-                      }}
-                    >
-                      <span>
-                        {item.quantity} ×{' '}
-                        {item.name}
-                      </span>
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-800 p-4">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-bold">
+                        Pedido #{order.id}
+                      </h3>
 
                       <span
-                        style={{
-                          whiteSpace:
-                            'nowrap',
-                          fontWeight: 600,
-                        }}
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          isPending
+                            ? 'bg-amber-500/15 text-amber-300'
+                            : 'bg-green-500/15 text-green-300'
+                        }`}
                       >
-                        $
-                        {(
-                          item.price_at_sale *
-                          item.quantity
-                        ).toFixed(2)}
+                        {isPending ? 'Pendiente de decisión' : 'Aprobado'}
                       </span>
                     </div>
-                  )
-                )}
-              </div>
 
-              <div
-                style={{
-                  marginBottom: '12px',
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: '13px',
-                    color: '#64748b',
-                  }}
-                >
-                  Tipo de pedido
-                </div>
+                    <p className="mt-2 font-medium">
+                      {order.customer_name || 'Cliente sin nombre'}
+                    </p>
 
-                <div
-                  style={{
-                    fontWeight: 600,
-                    marginTop: '2px',
-                  }}
-                >
-                  {order.order_type ||
-                    'No especificado'}
-                </div>
+                    <p className="text-sm text-gray-400">
+                      {order.customer_phone || 'Sin teléfono'}
+                      {order.customer_document
+                        ? ` · CI/RIF: ${order.customer_document}`
+                        : ''}
+                    </p>
 
-                {order.delivery_zone && (
-                  <div
-                    style={{
-                      marginTop: '4px',
-                      fontSize: '13px',
-                      color: '#475569',
-                    }}
-                  >
-                    Zona:{' '}
-                    {order.delivery_zone}
-                  </div>
-                )}
-
-                {order.delivery_address && (
-                  <div
-                    style={{
-                      marginTop: '4px',
-                      fontSize: '13px',
-                      color: '#475569',
-                    }}
-                  >
-                    Dirección:{' '}
-                    {order.delivery_address}
-                  </div>
-                )}
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent:
-                    'space-between',
-                  alignItems: 'center',
-                  gap: '12px',
-                  marginBottom: '14px',
-                  paddingTop: '12px',
-                  borderTop:
-                    '1px solid #e2e8f0',
-                }}
-              >
-                <div>
-                  <div
-                    style={{
-                      fontSize: '13px',
-                      color: '#64748b',
-                    }}
-                  >
-                    Total
+                    <p className="mt-1 text-xs text-gray-500">
+                      {formatDate(order.created_at)}
+                    </p>
                   </div>
 
-                  <div
-                    style={{
-                      fontSize: '20px',
-                      fontWeight: 800,
-                    }}
-                  >
-                    $
-                    {Number(
-                      order.total_usd
-                    ).toFixed(2)}
+                  <div className="text-right">
+                    <p className="text-xl font-bold text-green-300">
+                      {formatUSD(order.total_usd)}
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      {formatVES(order.total_ves)}
+                    </p>
                   </div>
                 </div>
 
-                <div
-                  style={{
-                    textAlign: 'right',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: '13px',
-                      color: '#64748b',
-                    }}
-                  >
-                    Total Bs
+                <div className="space-y-3 p-4">
+                  <div className="grid gap-2 text-sm sm:grid-cols-2">
+                    <p>
+                      <span className="text-gray-500">Tipo:</span>{' '}
+                      {order.order_type || 'No especificado'}
+                    </p>
+
+                    <p>
+                      <span className="text-gray-500">Pago indicado:</span>{' '}
+                      {order.payment_method || 'No indicado'}
+                    </p>
+
+                    {order.delivery_zone && (
+                      <p>
+                        <span className="text-gray-500">Zona:</span>{' '}
+                        {order.delivery_zone}
+                      </p>
+                    )}
+
+                    {order.delivery_address && (
+                      <p className="sm:col-span-2">
+                        <span className="text-gray-500">Dirección:</span>{' '}
+                        {order.delivery_address}
+                      </p>
+                    )}
                   </div>
 
-                  <div
-                    style={{
-                      fontWeight: 700,
-                    }}
-                  >
-                    Bs.{' '}
-                    {Number(
-                      order.total_ves
-                    ).toFixed(2)}
+                  <div>
+                    <p className="mb-2 text-sm font-semibold text-gray-300">
+                      Productos ({order.items.length})
+                    </p>
+
+                    {order.items.length === 0 ? (
+                      <p className="text-sm text-amber-300">
+                        Este pedido no tiene productos registrados.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {order.items.map((item, index) => (
+                          <div
+                            key={`${order.id}-${item.product_id}-${index}`}
+                            className="flex items-start justify-between gap-3 rounded-lg bg-gray-900 px-3 py-2 text-sm"
+                          >
+                            <div>
+                              <p className="font-medium">
+                                {item.name}
+                              </p>
+                              <p className="text-gray-400">
+                                Cantidad: {item.quantity}
+                              </p>
+                            </div>
+
+                            <p className="whitespace-nowrap text-gray-300">
+                              {formatUSD(
+                                item.quantity * item.price_at_sale
+                              )}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
+
+                  {isPending && (
+                    <div className="grid gap-2 border-t border-gray-800 pt-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void updateOrderStatus(order, 'aprobado')
+                        }
+                        disabled={
+                          processingId !== null ||
+                          order.items.length === 0
+                        }
+                        className="rounded-lg bg-green-600 px-4 py-3 font-semibold text-white transition hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isProcessing
+                          ? 'Procesando...'
+                          : '✓ Aceptar pedido'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void updateOrderStatus(order, 'cancelado')
+                        }
+                        disabled={processingId !== null}
+                        className="rounded-lg border border-red-700 px-4 py-3 font-semibold text-red-300 transition hover:bg-red-950/50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isProcessing
+                          ? 'Procesando...'
+                          : '✕ Rechazar pedido'}
+                      </button>
+                    </div>
+                  )}
+
+                  {isApproved && (
+                    <div className="border-t border-gray-800 pt-3">
+                      <button
+                        type="button"
+                        onClick={() => onLoadOrder(order)}
+                        disabled={
+                          isLoaded ||
+                          processingId !== null ||
+                          order.items.length === 0
+                        }
+                        className="w-full rounded-lg bg-fuchsia-600 px-4 py-3 font-semibold text-white transition hover:bg-fuchsia-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isLoaded
+                          ? '✓ Pedido cargado en el POS'
+                          : 'Cargar al POS y facturar →'}
+                      </button>
+
+                      <p className="mt-2 text-xs text-gray-500">
+                        El pedido se facturará al confirmar el pago
+                        con una caja abierta.
+                      </p>
+                    </div>
+                  )}
                 </div>
-              </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
 
-              <button
-                type="button"
-                onClick={() =>
-                  onLoadOrder(order)
-                }
-                disabled={isLoaded}
-                style={{
-                  width: '100%',
-                  padding: '11px 14px',
-                  border: 'none',
-                  borderRadius: '10px',
-                  background: isLoaded
-                    ? '#16a34a'
-                    : '#0f172a',
-                  color: '#ffffff',
-                  fontWeight: 700,
-                  cursor: isLoaded
-                    ? 'default'
-                    : 'pointer',
-                  opacity: isLoaded
-                    ? 0.9
-                    : 1,
-                }}
-              >
-                {isLoaded
-                  ? '✓ Cargado en POS'
-                  : 'Cargar al POS →'}
-              </button>
-            </article>
-          );
-        })}
-      </div>
+      <p className="text-center text-xs text-gray-500">
+        Actualización automática cada 10 segundos.
+      </p>
     </section>
   );
 }
+```
