@@ -54,21 +54,19 @@ export default function WebOrdersModule({
     }
 
     try {
-      const [pendingResponse, approvedResponse] =
-        await Promise.all([
-          fetch('/api/admin/orders?status=pendiente', {
-            cache: 'no-store',
-          }),
-          fetch('/api/admin/orders?status=aprobado', {
-            cache: 'no-store',
-          }),
-        ]);
+      const [pendingResponse, approvedResponse] = await Promise.all([
+        fetch('/api/admin/orders?status=pendiente', {
+          cache: 'no-store',
+        }),
+        fetch('/api/admin/orders?status=aprobado', {
+          cache: 'no-store',
+        }),
+      ]);
 
-      const [pendingData, approvedData] =
-        await Promise.all([
-          pendingResponse.json(),
-          approvedResponse.json(),
-        ]);
+      const [pendingData, approvedData] = await Promise.all([
+        pendingResponse.json(),
+        approvedResponse.json(),
+      ]);
 
       if (!pendingResponse.ok || !pendingData.success) {
         throw new Error(
@@ -84,42 +82,38 @@ export default function WebOrdersModule({
         );
       }
 
-      const pendingOrders: WebOrder[] =
-        Array.isArray(pendingData.orders)
-          ? pendingData.orders
-          : [];
+      const pendingOrders: WebOrder[] = Array.isArray(
+        pendingData.orders
+      )
+        ? pendingData.orders
+        : [];
 
-      const approvedOrders: WebOrder[] =
-        Array.isArray(approvedData.orders)
-          ? approvedData.orders
-          : [];
+      const approvedOrders: WebOrder[] = Array.isArray(
+        approvedData.orders
+      )
+        ? approvedData.orders
+        : [];
 
-      // Evita duplicados si un pedido cambia de estado
-      // mientras se realizan las dos consultas.
       const uniqueOrders = new Map<number, WebOrder>();
 
-      for (const order of [
-        ...pendingOrders,
-        ...approvedOrders,
-      ]) {
+      for (const order of [...pendingOrders, ...approvedOrders]) {
         uniqueOrders.set(Number(order.id), order);
       }
 
-      setOrders(
-        Array.from(uniqueOrders.values()).sort(
-          (a, b) => {
-            const aPending = a.status === 'pendiente' ? 0 : 1;
-            const bPending = b.status === 'pendiente' ? 0 : 1;
+      const sortedOrders = Array.from(uniqueOrders.values()).sort(
+        (a, b) => {
+          const aPending = a.status === 'pendiente' ? 0 : 1;
+          const bPending = b.status === 'pendiente' ? 0 : 1;
 
-            if (aPending !== bPending) {
-              return aPending - bPending;
-            }
-
-            return Number(b.id) - Number(a.id);
+          if (aPending !== bPending) {
+            return aPending - bPending;
           }
-        )
+
+          return Number(b.id) - Number(a.id);
+        }
       );
 
+      setOrders(sortedOrders);
       setError('');
     } catch (err) {
       console.error('Error cargando pedidos web:', err);
@@ -149,17 +143,22 @@ export default function WebOrdersModule({
     order: WebOrder,
     status: 'aprobado' | 'cancelado'
   ) => {
-    const action =
-      status === 'aprobado' ? 'aceptar' : 'rechazar';
-
     if (processingId !== null) {
       return;
     }
 
     if (status === 'cancelado') {
-      const confirmed = window.confirm(
-        `¿Deseas rechazar el pedido web #${order.id} de ${order.customer_name || 'este cliente'}?`
-      );
+      const customerName =
+        order.customer_name || 'este cliente';
+
+      const confirmationMessage =
+        '¿Deseas rechazar el pedido web #' +
+        order.id +
+        ' de ' +
+        customerName +
+        '?';
+
+      const confirmed = window.confirm(confirmationMessage);
 
       if (!confirmed) {
         return;
@@ -186,14 +185,18 @@ export default function WebOrdersModule({
 
       if (!response.ok || !data.success) {
         throw new Error(
-          data.message || `No se pudo ${action} el pedido.`
+          data.message || 'No se pudo actualizar el pedido.'
         );
       }
 
       setMessage(
         status === 'aprobado'
-          ? `Pedido #${order.id} aceptado. Ya puedes cargarlo al POS.`
-          : `Pedido #${order.id} rechazado correctamente.`
+          ? 'Pedido #' +
+              order.id +
+              ' aceptado. Ya puedes cargarlo al POS.'
+          : 'Pedido #' +
+              order.id +
+              ' rechazado correctamente.'
       );
 
       await loadOrders();
@@ -203,7 +206,7 @@ export default function WebOrdersModule({
       setError(
         err instanceof Error
           ? err.message
-          : `No se pudo ${action} el pedido.`
+          : 'No se pudo actualizar el pedido.'
       );
     } finally {
       setProcessingId(null);
@@ -261,12 +264,9 @@ export default function WebOrdersModule({
     <section className="mb-6 space-y-4 rounded-xl border border-gray-700 bg-gray-900 p-4 text-white sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold">
-            Pedidos de la web
-          </h2>
-
+          <h2 className="text-xl font-bold">Pedidos de la web</h2>
           <p className="mt-1 text-sm text-gray-400">
-            Acepta o rechaza los pedidos desde la caja.
+            Acepta o rechaza los pedidos directamente desde la caja.
           </p>
         </div>
 
@@ -300,18 +300,14 @@ export default function WebOrdersModule({
 
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-amber-700/50 bg-amber-950/30 p-3">
-          <p className="text-sm text-amber-300">
-            Por revisar
-          </p>
+          <p className="text-sm text-amber-300">Por revisar</p>
           <p className="mt-1 text-2xl font-bold">
             {pendingOrders.length}
           </p>
         </div>
 
         <div className="rounded-lg border border-green-700/50 bg-green-950/30 p-3">
-          <p className="text-sm text-green-300">
-            Aprobados
-          </p>
+          <p className="text-sm text-green-300">Aprobados</p>
           <p className="mt-1 text-2xl font-bold">
             {approvedOrders.length}
           </p>
@@ -354,7 +350,9 @@ export default function WebOrdersModule({
                             : 'bg-green-500/15 text-green-300'
                         }`}
                       >
-                        {isPending ? 'Pendiente de decisión' : 'Aprobado'}
+                        {isPending
+                          ? 'Pendiente de decisión'
+                          : 'Aprobado'}
                       </span>
                     </div>
 
@@ -365,7 +363,7 @@ export default function WebOrdersModule({
                     <p className="text-sm text-gray-400">
                       {order.customer_phone || 'Sin teléfono'}
                       {order.customer_document
-                        ? ` · CI/RIF: ${order.customer_document}`
+                        ? ' · CI/RIF: ' + order.customer_document
                         : ''}
                     </p>
 
@@ -392,7 +390,9 @@ export default function WebOrdersModule({
                     </p>
 
                     <p>
-                      <span className="text-gray-500">Pago indicado:</span>{' '}
+                      <span className="text-gray-500">
+                        Pago indicado:
+                      </span>{' '}
                       {order.payment_method || 'No indicado'}
                     </p>
 
@@ -405,7 +405,9 @@ export default function WebOrdersModule({
 
                     {order.delivery_address && (
                       <p className="sm:col-span-2">
-                        <span className="text-gray-500">Dirección:</span>{' '}
+                        <span className="text-gray-500">
+                          Dirección:
+                        </span>{' '}
                         {order.delivery_address}
                       </p>
                     )}
@@ -424,13 +426,17 @@ export default function WebOrdersModule({
                       <div className="space-y-2">
                         {order.items.map((item, index) => (
                           <div
-                            key={`${order.id}-${item.product_id}-${index}`}
+                            key={
+                              order.id +
+                              '-' +
+                              item.product_id +
+                              '-' +
+                              index
+                            }
                             className="flex items-start justify-between gap-3 rounded-lg bg-gray-900 px-3 py-2 text-sm"
                           >
                             <div>
-                              <p className="font-medium">
-                                {item.name}
-                              </p>
+                              <p className="font-medium">{item.name}</p>
                               <p className="text-gray-400">
                                 Cantidad: {item.quantity}
                               </p>
@@ -498,7 +504,7 @@ export default function WebOrdersModule({
                       </button>
 
                       <p className="mt-2 text-xs text-gray-500">
-                        El pedido se facturará al confirmar el pago
+                        La facturación se completa al confirmar el pago
                         con una caja abierta.
                       </p>
                     </div>
