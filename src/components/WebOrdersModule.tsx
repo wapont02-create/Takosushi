@@ -54,7 +54,7 @@ export default function WebOrdersModule({
     }
 
     try {
-      const [pendingResponse, approvedResponse] = await Promise.all([
+      const responses = await Promise.all([
         fetch('/api/admin/orders?status=pendiente', {
           cache: 'no-store',
         }),
@@ -63,10 +63,11 @@ export default function WebOrdersModule({
         }),
       ]);
 
-      const [pendingData, approvedData] = await Promise.all([
-        pendingResponse.json(),
-        approvedResponse.json(),
-      ]);
+      const pendingResponse = responses[0];
+      const approvedResponse = responses[1];
+
+      const pendingData = await pendingResponse.json();
+      const approvedData = await approvedResponse.json();
 
       if (!pendingResponse.ok || !pendingData.success) {
         throw new Error(
@@ -94,13 +95,17 @@ export default function WebOrdersModule({
         ? approvedData.orders
         : [];
 
-      const uniqueOrders = new Map<number, WebOrder>();
+      const ordersMap = new Map<number, WebOrder>();
 
-      for (const order of [...pendingOrders, ...approvedOrders]) {
-        uniqueOrders.set(Number(order.id), order);
-      }
+      pendingOrders.forEach((order) => {
+        ordersMap.set(Number(order.id), order);
+      });
 
-      const sortedOrders = Array.from(uniqueOrders.values()).sort(
+      approvedOrders.forEach((order) => {
+        ordersMap.set(Number(order.id), order);
+      });
+
+      const sortedOrders = Array.from(ordersMap.values()).sort(
         (a, b) => {
           const aPending = a.status === 'pendiente' ? 0 : 1;
           const bPending = b.status === 'pendiente' ? 0 : 1;
@@ -177,7 +182,7 @@ export default function WebOrdersModule({
         },
         body: JSON.stringify({
           id: order.id,
-          status,
+          status: status,
         }),
       });
 
@@ -189,15 +194,19 @@ export default function WebOrdersModule({
         );
       }
 
-      setMessage(
-        status === 'aprobado'
-          ? 'Pedido #' +
-              order.id +
-              ' aceptado. Ya puedes cargarlo al POS.'
-          : 'Pedido #' +
-              order.id +
-              ' rechazado correctamente.'
-      );
+      if (status === 'aprobado') {
+        setMessage(
+          'Pedido #' +
+            order.id +
+            ' aceptado. Ya puedes cargarlo al POS.'
+        );
+      } else {
+        setMessage(
+          'Pedido #' +
+            order.id +
+            ' rechazado correctamente.'
+        );
+      }
 
       await loadOrders();
     } catch (err) {
@@ -221,19 +230,21 @@ export default function WebOrdersModule({
     (order) => order.status === 'aprobado'
   );
 
-  const formatUSD = (value: number) =>
-    new Intl.NumberFormat('es-VE', {
+  const formatUSD = (value: number) => {
+    return new Intl.NumberFormat('es-VE', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 2,
     }).format(Number(value) || 0);
+  };
 
-  const formatVES = (value: number) =>
-    new Intl.NumberFormat('es-VE', {
+  const formatVES = (value: number) => {
+    return new Intl.NumberFormat('es-VE', {
       style: 'currency',
       currency: 'VES',
       minimumFractionDigits: 2,
     }).format(Number(value) || 0);
+  };
 
   const formatDate = (value: string | null) => {
     if (!value) {
@@ -264,7 +275,10 @@ export default function WebOrdersModule({
     <section className="mb-6 space-y-4 rounded-xl border border-gray-700 bg-gray-900 p-4 text-white sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold">Pedidos de la web</h2>
+          <h2 className="text-xl font-bold">
+            Pedidos de la web
+          </h2>
+
           <p className="mt-1 text-sm text-gray-400">
             Acepta o rechaza los pedidos directamente desde la caja.
           </p>
@@ -300,14 +314,20 @@ export default function WebOrdersModule({
 
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-amber-700/50 bg-amber-950/30 p-3">
-          <p className="text-sm text-amber-300">Por revisar</p>
+          <p className="text-sm text-amber-300">
+            Por revisar
+          </p>
+
           <p className="mt-1 text-2xl font-bold">
             {pendingOrders.length}
           </p>
         </div>
 
         <div className="rounded-lg border border-green-700/50 bg-green-950/30 p-3">
-          <p className="text-sm text-green-300">Aprobados</p>
+          <p className="text-sm text-green-300">
+            Aprobados
+          </p>
+
           <p className="mt-1 text-2xl font-bold">
             {approvedOrders.length}
           </p>
@@ -319,6 +339,7 @@ export default function WebOrdersModule({
           <p className="font-medium text-gray-300">
             No hay pedidos web pendientes ni aprobados.
           </p>
+
           <p className="mt-1 text-sm text-gray-500">
             Los pedidos nuevos aparecerán aquí automáticamente.
           </p>
@@ -329,7 +350,14 @@ export default function WebOrdersModule({
             const isPending = order.status === 'pendiente';
             const isApproved = order.status === 'aprobado';
             const isProcessing = processingId === order.id;
-            const isLoaded = Number(loadedOrderId) === order.id;
+            const isLoaded =
+              Number(loadedOrderId) === Number(order.id);
+
+            const statusClass =
+              'rounded-full px-2.5 py-1 text-xs font-semibold ' +
+              (isPending
+                ? 'bg-amber-500/15 text-amber-300'
+                : 'bg-green-500/15 text-green-300');
 
             return (
               <article
@@ -343,13 +371,7 @@ export default function WebOrdersModule({
                         Pedido #{order.id}
                       </h3>
 
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          isPending
-                            ? 'bg-amber-500/15 text-amber-300'
-                            : 'bg-green-500/15 text-green-300'
-                        }`}
-                      >
+                      <span className={statusClass}>
                         {isPending
                           ? 'Pendiente de decisión'
                           : 'Aprobado'}
@@ -376,6 +398,7 @@ export default function WebOrdersModule({
                     <p className="text-xl font-bold text-green-300">
                       {formatUSD(order.total_usd)}
                     </p>
+
                     <p className="text-sm text-gray-400">
                       {formatVES(order.total_ves)}
                     </p>
@@ -385,7 +408,9 @@ export default function WebOrdersModule({
                 <div className="space-y-3 p-4">
                   <div className="grid gap-2 text-sm sm:grid-cols-2">
                     <p>
-                      <span className="text-gray-500">Tipo:</span>{' '}
+                      <span className="text-gray-500">
+                        Tipo:
+                      </span>{' '}
                       {order.order_type || 'No especificado'}
                     </p>
 
@@ -398,7 +423,9 @@ export default function WebOrdersModule({
 
                     {order.delivery_zone && (
                       <p>
-                        <span className="text-gray-500">Zona:</span>{' '}
+                        <span className="text-gray-500">
+                          Zona:
+                        </span>{' '}
                         {order.delivery_zone}
                       </p>
                     )}
@@ -424,31 +451,37 @@ export default function WebOrdersModule({
                       </p>
                     ) : (
                       <div className="space-y-2">
-                        {order.items.map((item, index) => (
-                          <div
-                            key={
-                              order.id +
-                              '-' +
-                              item.product_id +
-                              '-' +
-                              index
-                            }
-                            className="flex items-start justify-between gap-3 rounded-lg bg-gray-900 px-3 py-2 text-sm"
-                          >
-                            <div>
-                              <p className="font-medium">{item.name}</p>
-                              <p className="text-gray-400">
-                                Cantidad: {item.quantity}
+                        {order.items.map((item, index) => {
+                          const itemKey =
+                            String(order.id) +
+                            '-' +
+                            String(item.product_id) +
+                            '-' +
+                            String(index);
+
+                          return (
+                            <div
+                              key={itemKey}
+                              className="flex items-start justify-between gap-3 rounded-lg bg-gray-900 px-3 py-2 text-sm"
+                            >
+                              <div>
+                                <p className="font-medium">
+                                  {item.name}
+                                </p>
+
+                                <p className="text-gray-400">
+                                  Cantidad: {item.quantity}
+                                </p>
+                              </div>
+
+                              <p className="whitespace-nowrap text-gray-300">
+                                {formatUSD(
+                                  item.quantity * item.price_at_sale
+                                )}
                               </p>
                             </div>
-
-                            <p className="whitespace-nowrap text-gray-300">
-                              {formatUSD(
-                                item.quantity * item.price_at_sale
-                              )}
-                            </p>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
