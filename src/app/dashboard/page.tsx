@@ -3369,16 +3369,16 @@ export default function DashboardPOS() {
   ============================================================ */
 
   return (
-    <div className="min-h-screen bg-slate-100/60 text-slate-800 flex flex-col relative font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-50 to-blue-50/70 text-slate-800 flex flex-col relative font-sans overflow-x-hidden">
 
       {/* ======================================================
           HEADER
       ====================================================== */}
 
-      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 px-3 sm:px-6 py-3 flex flex-wrap justify-between items-center gap-3 sm:gap-4 shadow-sm">
+      <header className="bg-slate-950 text-white border-b border-blue-400/30 sticky top-0 z-30 px-3 sm:px-6 py-3 sm:py-4 flex flex-wrap justify-between items-center gap-3 sm:gap-4 shadow-[0_8px_30px_rgba(15,23,42,0.18)]">
         <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <div
-            className="bg-blue-600 text-white p-2 rounded-2xl font-black text-sm shadow-sm cursor-pointer"
+            className="bg-gradient-to-br from-cyan-400 to-blue-600 text-white p-2.5 rounded-2xl font-black text-sm shadow-lg shadow-cyan-500/20 cursor-pointer ring-1 ring-white/20"
             onClick={() =>
               handleTabChange(
                 'welcome'
@@ -3389,16 +3389,16 @@ export default function DashboardPOS() {
           </div>
 
           <div>
-            <h1 className="text-sm font-black text-slate-900 tracking-tight">
+            <h1 className="text-sm font-black text-white tracking-wide">
               Enterprise Suite
             </h1>
 
-            <p className="text-[10px] text-slate-400 font-semibold">
+            <p className="text-[10px] text-slate-400 font-semibold tracking-wide">
               Sistema de Gestión Comercial
             </p>
           </div>
 
-          <div className="hidden sm:flex items-center bg-blue-50/70 border border-blue-100 rounded-xl px-3 py-1 text-xs font-bold text-blue-700">
+          <div className="hidden sm:flex items-center bg-blue-500/10 border border-blue-400/25 rounded-xl px-3 py-1.5 text-xs font-bold text-cyan-300">
             BCV: Bs.{' '}
             {exchangeRate.toFixed(
               2
@@ -3409,7 +3409,7 @@ export default function DashboardPOS() {
 
         {/* NAVEGACIÓN */}
 
-        <nav aria-label="Navegación principal" className="order-3 sm:order-none w-full sm:w-auto min-w-0 flex items-center gap-1 bg-slate-100/80 p-1 rounded-2xl text-xs font-bold border border-slate-200/70 overflow-x-auto overscroll-x-contain whitespace-nowrap sm:max-w-full">
+        <nav aria-label="Navegación principal" className="order-3 sm:order-none w-full sm:w-auto min-w-0 flex items-center gap-1.5 bg-slate-900 p-1.5 rounded-2xl text-xs font-bold border border-white/10 shadow-inner overflow-x-auto overscroll-x-contain whitespace-nowrap sm:max-w-full">
           <button
             onClick={() =>
               handleTabChange(
@@ -3419,8 +3419,8 @@ export default function DashboardPOS() {
             className={`shrink-0 min-h-9 px-3 sm:px-3.5 py-2 sm:py-1.5 rounded-xl transition ${
               activeTab ===
               'welcome'
-                ? 'bg-white text-blue-600 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md shadow-blue-950/30 ring-1 ring-white/10'
+                : 'text-slate-300 hover:bg-white/10 hover:text-white'
             }`}
           >
             🏠 Inicio
@@ -3437,8 +3437,8 @@ export default function DashboardPOS() {
               }
               className={`shrink-0 min-h-9 px-3 sm:px-3.5 py-2 sm:py-1.5 rounded-xl transition ${
                 activeTab === 'pos'
-                  ? 'bg-white text-blue-600 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md shadow-blue-950/30 ring-1 ring-white/10'
+                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
               }`}
             >
               🛒 POS Caja
@@ -3457,8 +3457,8 @@ export default function DashboardPOS() {
               className={`shrink-0 min-h-9 px-3 sm:px-3.5 py-2 sm:py-1.5 rounded-xl transition ${
                 activeTab ===
                 'inventory'
-                  ? 'bg-white text-blue-600 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md shadow-blue-950/30 ring-1 ring-white/10'
+                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
               }`}
             >
               📦 Inventario
@@ -3477,8 +3477,8 @@ export default function DashboardPOS() {
               className={`shrink-0 min-h-9 px-3 sm:px-3.5 py-2 sm:py-1.5 rounded-xl transition ${
                 activeTab ===
                 'reports'
-                  ? 'bg-white text-blue-600 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md shadow-blue-950/30 ring-1 ring-white/10'
+                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
               }`}
             >
               📊 Reportes
@@ -3505,8 +3505,8 @@ export default function DashboardPOS() {
               className={`shrink-0 min-h-9 px-3 sm:px-3.5 py-2 sm:py-1.5 rounded-xl transition ${
                 activeTab ===
                 'accounts'
-                  ? 'bg-white text-blue-600 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md shadow-blue-950/30 ring-1 ring-white/10'
+                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
               }`}
             >
               📑 Finanzas
@@ -3525,8 +3525,8 @@ export default function DashboardPOS() {
               className={`shrink-0 min-h-9 px-3 sm:px-3.5 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition ${
                 activeTab ===
                 'customers'
-                  ? 'bg-white text-blue-600 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md shadow-blue-950/30 ring-1 ring-white/10'
+                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
               }`}
             >
               👥 Clientes
@@ -3545,8 +3545,8 @@ export default function DashboardPOS() {
               className={`shrink-0 min-h-9 px-3 sm:px-3.5 py-2 sm:py-1.5 rounded-xl transition ${
                 activeTab ===
                 'roles'
-                  ? 'bg-white text-blue-600 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md shadow-blue-950/30 ring-1 ring-white/10'
+                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
               }`}
             >
               🔐 Roles
@@ -3564,20 +3564,20 @@ export default function DashboardPOS() {
                   true
                 )
               }
-              className="bg-amber-600 hover:bg-amber-500 text-white font-bold px-3 py-2 rounded-xl text-xs transition shadow-sm flex items-center gap-1.5"
+              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-3.5 py-2.5 rounded-xl text-xs transition shadow-md shadow-amber-950/20 flex items-center gap-1.5 min-h-10"
             >
               🔒 Arqueo / Cerrar Caja
             </button>
           )}
 
-          <div className="min-w-0 flex items-center gap-2 sm:gap-3 bg-slate-50 border border-slate-200/70 px-2.5 sm:px-3 py-1.5 rounded-2xl">
+          <div className="min-w-0 flex items-center gap-2 sm:gap-3 bg-white/5 border border-white/10 px-2.5 sm:px-3 py-2 rounded-2xl">
             <div className="text-right">
-              <div className="text-xs font-bold text-slate-800">
+              <div className="text-xs font-bold text-white">
                 {currentUserObj?.name ||
                   currentUsername}
               </div>
 
-              <div className="text-[10px] text-blue-600 font-semibold">
+              <div className="text-[10px] text-cyan-300 font-semibold">
                 {currentRoleObj?.name ||
                   'Operador'}
               </div>
@@ -3592,7 +3592,7 @@ export default function DashboardPOS() {
                   e.target.value
                 )
               }
-              className="bg-white border border-slate-200 rounded-xl px-2 py-1 text-xs font-bold text-slate-700 focus:outline-none"
+              className="max-w-[140px] bg-slate-900 border border-white/15 rounded-xl px-2 py-2 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
             >
               {usersList.map(
                 (u: any) => (
@@ -3620,7 +3620,7 @@ export default function DashboardPOS() {
           MAIN
       ====================================================== */}
 
-      <main className="flex-1 p-3 sm:p-6 max-w-7xl mx-auto w-full min-w-0 space-y-4 sm:space-y-6">
+      <main className="flex-1 p-3 sm:p-6 lg:p-8 max-w-[1440px] mx-auto w-full min-w-0 space-y-4 sm:space-y-6">
 
         {/* ====================================================
             BIENVENIDA
@@ -6582,11 +6582,17 @@ export default function DashboardPOS() {
                 <div className="border-b border-dashed border-black my-2" />
 
                 <div>
-                  Venta: #{lastPrintedSale.id}
+                  Venta: #
+                  {
+                    lastPrintedSale.id
+                  }
                 </div>
 
                 <div>
-                  Fecha: {lastPrintedSale.date}
+                  Fecha:{' '}
+                  {
+                    lastPrintedSale.date
+                  }
                 </div>
 
                 <div>
