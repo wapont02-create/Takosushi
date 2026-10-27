@@ -192,7 +192,7 @@ export default function ClientMenu({
       setIsSubmitting(false);
     }
 
-    const phone = '584143065287';
+    const phone = '584129269308';
     let message = `🍣 *NUEVO PEDIDO - TAKOSUSHI* 🍣\n\n`;
     message += `👤 *Cliente:* ${customerName}\n`;
     message += `📞 *Teléfono:* ${customerPhone}\n`;
