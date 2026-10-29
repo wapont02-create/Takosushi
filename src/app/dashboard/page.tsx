@@ -1,127 +1,160 @@
-                </div>
+'use client';
 
-                <div className="border-b border-dashed border-black my-2" />
+import { useState, useEffect } from 'react';
+import RolesManagerModule from '../../components/RolesManagerModule';
+import WebOrdersModule from '../../components/WebOrdersModule';
+import { getRoles, getUsers } from '../../utils/rolesManager';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid
+} from 'recharts';
 
-                <div>
-                  Venta: #
-                  {
-                    lastPrintedSale.id
-                  }
-                </div>
+type Product = {
+  id: number;
+  name: string;
+  costPrice: number;
+  price: number;
+  category: string;
+  description?: string;
+  taxable: boolean;
+  stock: number;
+  image?: string;
+  active?: boolean;
+  hasSales?: boolean;
+};
 
-                <div>
-                  Fecha:{' '}
-                  {
-                    lastPrintedSale.date
-                  }
-                </div>
+type CartItem = Product & {
+  quantity: number;
+};
 
-                <div>
-                  Cliente:{' '}
-                  {lastPrintedSale.clientName ||
-                    'Cliente Genérico'}
-                </div>
+type PaymentMethodType =
+  | 'Efectivo USD'
+  | 'Efectivo Bs'
+  | 'Pago Móvil'
+  | 'Zelle'
+  | 'Binance Pay'
+  | 'Crédito / Fiado'
+  | 'Pago mixto';
 
-                <div>
-                  Caja: #
-                  {lastPrintedSale.cashRegisterId ||
-                    '—'}
-                </div>
+type SaleRecord = {
+  id: number;
+  date: string;
+  items: CartItem[];
+  subtotalUSD: number;
+  ivaUSD: number;
+  totalUSD: number;
+  totalBs: number;
+  exchangeRate: number;
+  paymentMethod: PaymentMethodType;
+  changeUSD: number;
+  clientName?: string;
+  created_at?: string;
+  cashRegisterId?: number;
+};
 
-                <div className="border-b border-dashed border-black my-2" />
+type CreditAccount = {
+  id: number;
+  clientName: string;
+  clientPhone: string;
+  clientDocument: string;
+  totalDebtUSD: number;
+  totalDebtBs: number;
+  date: string;
+  status: 'Pendiente' | 'Pagado';
+  saleId: number;
+};
 
-                {lastPrintedSale.items.map(
-                  (
-                    item: CartItem
-                  ) => (
-                    <div
-                      key={
-                        item.id
-                      }
-                      className="flex justify-between gap-2"
-                    >
-                      <span>
-                        {item.quantity}{' '}
-                        x{' '}
-                        {
-                          item.name
-                        }
-                      </span>
+type PayableAccount = {
+  id: number;
+  providerName: string;
+  providerDocument: string;
+  description: string;
+  totalDebtUSD: number;
+  totalDebtBs: number;
+  dueDate: string;
+  date: string;
+  status: 'Pendiente' | 'Pagado';
+};
 
-                      <span>
-                        $
-                        {(
-                          item.quantity *
-                          item.price
-                        ).toFixed(
-                          2
-                        )}
-                      </span>
-                    </div>
-                  )
-                )}
+const IVA_RATE = 0.16;
 
-                <div className="border-b border-dashed border-black my-2" />
+async function readJson<T = any>(
+  response: Response
+): Promise<T> {
+  const text = await response.text();
 
-                <div className="flex justify-between">
-                  <span>
-                    Subtotal
-                  </span>
-
-                  <b>
-                    $
-                    {lastPrintedSale.subtotalUSD.toFixed(
-                      2
-                    )}
-                  </b>
-                </div>
-
-                <div className="flex justify-between">
-                  <span>
-                    IVA
-                  </span>
-
-                  <b>
-                    $
-                    {lastPrintedSale.ivaUSD.toFixed(
-                      2
-                    )}
-                  </b>
-                </div>
-
-                <div className="flex justify-between text-sm">
-                  <span>
-                    Total
-                  </span>
-
-                  <b>
-                    $
-                    {lastPrintedSale.totalUSD.toFixed(
-                      2
-                    )}
-                  </b>
-                </div>
-
-                <div className="flex justify-between">
-                  <span>
-                    Bs.
-                  </span>
-
-                  <b>
-                    {lastPrintedSale.totalBs.toFixed(
-                      2
-                    )}
-                  </b>
-                </div>
-
-                <div className="mt-3 text-center">
-                  ¡Gracias por su compra!
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(
+      `Respuesta inválida del servidor (${response.status}): ${text.slice(
+        0,
+        200
+      )}`
+    );
+  }
 }
+
+/* ============================================================
+   SELECTOR DE CLIENTES
+============================================================ */
+
+function POSCustomerSelector({
+  onSelectCustomer
+}: {
+  onSelectCustomer: (client: {
+    name: string;
+    document: string;
+    phone: string;
+  }) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<any[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [isAddingNew, setIsAddingNew] = useState(false);
+
+  const [newName, setNewName] = useState('');
+  const [newDoc, setNewDoc] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+
+  useEffect(() => {
+    if (query.length > 1) {
+      fetch(
+        `/api/customers?q=${encodeURIComponent(query)}`
+      )
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            setResults(data);
+            setShowDropdown(true);
+          }
+        })
+        .catch(err =>
+          console.error(
+            'Error buscando clientes:',
+            err
+          )
+        );
+    } else {
+      setResults([]);
+      setShowDropdown(false);
+    }
+  }, [query]);
+
+  const handleRegisterQuickCustomer = async (
+    e: React.FormEvent
+  ) => {
+    e.preventDefault();
+
+    if (!newName.trim()) return;
+
+    try {
+      const res = await fetch('/api/customers', {
+        method: 'POST',
