@@ -57,6 +57,7 @@ type SaleRecord = {
   clientName?: string;
   created_at?: string;
   cashRegisterId?: number;
+  payments?: Array<{ method?: string; amount?: number; currency?: string }>;
 };
 
 type CreditAccount = {
@@ -720,8 +721,11 @@ export default function DashboardPOS() {
     reportFilterPeriod,
     setReportFilterPeriod
   ] = useState<
-    'all' | 'today' | 'week' | 'month'
-  >('all');
+    'all' | 'today' | 'week' | 'month' | 'currentMonth' | 'previousMonth' | 'custom'
+  >('month');
+
+  const [reportStartDate, setReportStartDate] = useState('');
+  const [reportEndDate, setReportEndDate] = useState('');
 
   /* ============================================================
      CUENTAS
@@ -2248,6 +2252,117 @@ export default function DashboardPOS() {
 
   const totalTransactionsCount =
     salesHistory.length;
+
+  /* ============================================================
+     ANALISIS GERENCIAL DE REPORTES
+     Todos los indicadores utilizan el mismo período filtrado.
+  ============================================================ */
+
+  const reportSales = salesHistory.filter(sale => {
+    const rawDate = sale.created_at || sale.date;
+    const saleDate = rawDate ? new Date(rawDate) : null;
+    if (!saleDate || Number.isNaN(saleDate.getTime())) return false;
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    if (reportFilterPeriod === 'all') return true;
+    if (reportFilterPeriod === 'today') return saleDate >= startOfToday;
+    if (reportFilterPeriod === 'week') {
+      const start = new Date(startOfToday);
+      start.setDate(start.getDate() - 6);
+      return saleDate >= start && saleDate <= now;
+    }
+    if (reportFilterPeriod === 'month') {
+      const start = new Date(startOfToday);
+      start.setDate(start.getDate() - 29);
+      return saleDate >= start && saleDate <= now;
+    }
+    if (reportFilterPeriod === 'currentMonth') {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      return saleDate >= start && saleDate <= now;
+    }
+    if (reportFilterPeriod === 'previousMonth') {
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const end = new Date(now.getFullYear(), now.getMonth(), 1);
+      return saleDate >= start && saleDate < end;
+    }
+    if (reportFilterPeriod === 'custom') {
+      if (!reportStartDate || !reportEndDate) return false;
+      const start = new Date(`${reportStartDate}T00:00:00`);
+      const end = new Date(`${reportEndDate}T23:59:59.999`);
+      return !Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && saleDate >= start && saleDate <= end;
+    }
+    return true;
+  });
+
+  const reportTotalUSD = reportSales.reduce((sum, sale) => sum + Number(sale.totalUSD || 0), 0);
+  const reportTotalBs = reportSales.reduce((sum, sale) => sum + Number(sale.totalBs || 0), 0);
+  const reportAverageTicket = reportSales.length ? reportTotalUSD / reportSales.length : 0;
+
+  const getReportItemValues = (item: any) => {
+    const quantity = Number(item?.quantity ?? item?.qty ?? 0);
+    const unitPrice = Number(item?.price_at_sale ?? item?.priceAtSale ?? item?.price ?? item?.unit_price ?? 0);
+    const costValue = item?.cost_at_sale ?? item?.cost_price_at_sale ?? item?.costPrice ?? item?.cost_price;
+    const hasCost = costValue !== undefined && costValue !== null && costValue !== '' && Number.isFinite(Number(costValue));
+    return { quantity, unitPrice, unitCost: hasCost ? Number(costValue) : 0, hasCost };
+  };
+
+  const reportItemRows = reportSales.flatMap(sale =>
+    (Array.isArray(sale.items) ? sale.items : []).map((item: any) => ({
+      sale,
+      item,
+      ...getReportItemValues(item),
+      name: String(item?.name ?? item?.product_name ?? 'Producto sin nombre')
+    }))
+  );
+  const reportHasProductDetails = reportItemRows.length > 0;
+  const reportHasCompleteCosts = reportHasProductDetails && reportItemRows.every(row => row.hasCost);
+  const reportGrossProfit = reportHasCompleteCosts
+    ? reportItemRows.reduce((sum, row) => sum + (row.unitPrice - row.unitCost) * row.quantity, 0)
+    : null;
+  const reportCostOfGoods = reportHasCompleteCosts
+    ? reportItemRows.reduce((sum, row) => sum + row.unitCost * row.quantity, 0)
+    : null;
+
+  const reportProductsByUnits = Object.values(reportItemRows.reduce((acc: Record<string, any>, row) => {
+    const key = row.name;
+    if (!acc[key]) acc[key] = { name: key, units: 0, revenue: 0 };
+    acc[key].units += row.quantity;
+    acc[key].revenue += row.unitPrice * row.quantity;
+    return acc;
+  }, {})).sort((a: any, b: any) => b.units - a.units).slice(0, 8);
+
+  const reportProductsByProfit = Object.values(reportItemRows.filter(row => row.hasCost).reduce((acc: Record<string, any>, row) => {
+    const key = row.name;
+    if (!acc[key]) acc[key] = { name: key, profit: 0, units: 0 };
+    acc[key].profit += (row.unitPrice - row.unitCost) * row.quantity;
+    acc[key].units += row.quantity;
+    return acc;
+  }, {})).sort((a: any, b: any) => b.profit - a.profit).slice(0, 8);
+
+  const reportCurrencyStats = reportSales.reduce((acc: Record<string, number>, sale) => {
+    const method = String(sale.paymentMethod || '');
+    const currency = method === 'Efectivo USD' ? 'USD' : method === 'Efectivo Bs' ? 'Bs' : 'No especificada en el registro';
+    acc[currency] = (acc[currency] || 0) + 1;
+    return acc;
+  }, {});
+
+  const reportPaymentStats = Object.values(reportSales.reduce((acc: Record<string, any>, sale) => {
+    const method = String(sale.paymentMethod || 'No especificado');
+    if (!acc[method]) acc[method] = { method, transactions: 0, amountUSD: 0, amountBs: 0 };
+    acc[method].transactions += 1;
+    acc[method].amountUSD += Number(sale.totalUSD || 0);
+    acc[method].amountBs += Number(sale.totalBs || 0);
+    return acc;
+  }, {})).sort((a: any, b: any) => b.transactions - a.transactions);
+
+  const reportDailySales = Object.values(reportSales.reduce((acc: Record<string, any>, sale) => {
+    const date = new Date(sale.created_at || sale.date);
+    const key = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+    if (!acc[key]) acc[key] = { sort: date.getTime(), date: date.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' }), total: 0 };
+    acc[key].total += Number(sale.totalUSD || 0);
+    return acc;
+  }, {})).sort((a: any, b: any) => a.sort - b.sort).slice(-14);
 
   const lowStockCount =
     products.filter(
@@ -4914,314 +5029,168 @@ export default function DashboardPOS() {
         )}
 
         {/* ====================================================
-            REPORTES
+            REPORTES - CENTRO DE ANALISIS GERENCIAL
         ==================================================== */}
 
-        {activeTab ===
-          'reports' && (
+        {activeTab === 'reports' && (
           <div className="space-y-6">
-            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
-              <div className="flex flex-col sm:flex-row justify-between gap-3 items-start sm:items-center border-b border-slate-100 pb-4">
+            <section className="rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-5 sm:p-7 text-white shadow-xl">
+              <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
                 <div>
-                  <h3 className="text-lg font-extrabold text-slate-800">
-                    📊 Reportes de Ventas
-                  </h3>
-
-                  <p className="text-xs text-slate-500">
-                    Seguimiento de ventas registradas en la base de datos.
-                  </p>
+                  <p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-300">Centro de análisis gerencial</p>
+                  <h2 className="mt-2 text-2xl sm:text-3xl font-black">Conoce la salud de tu negocio</h2>
+                  <p className="mt-2 max-w-2xl text-sm text-slate-300">Un resumen claro de tus ventas, rentabilidad, productos y comportamiento de pago.</p>
                 </div>
-
-                <select
-                  value={
-                    reportFilterPeriod
-                  }
-                  onChange={e =>
-                    setReportFilterPeriod(
-                      e.target
-                        .value as
-                        | 'all'
-                        | 'today'
-                        | 'week'
-                        | 'month'
-                    )
-                  }
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold"
-                >
-                  <option value="all">
-                    Todo
-                  </option>
-
-                  <option value="today">
-                    Hoy
-                  </option>
-
-                  <option value="week">
-                    Últimos 7 días
-                  </option>
-
-                  <option value="month">
-                    Últimos 30 días
-                  </option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
-                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
-                  <div className="text-[10px] uppercase font-bold text-blue-600">
-                    Ventas
-                  </div>
-
-                  <div className="text-xl font-black text-slate-900 mt-1">
-                    $
-                    {salesHistory
-                      .reduce(
-                        (a, s) =>
-                          a +
-                          s.totalUSD,
-                        0
-                      )
-                      .toFixed(2)}
-                  </div>
-                </div>
-
-                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4">
-                  <div className="text-[10px] uppercase font-bold text-emerald-600">
-                    Transacciones
-                  </div>
-
-                  <div className="text-xl font-black text-slate-900 mt-1">
-                    {
-                      salesHistory.length
-                    }
-                  </div>
-                </div>
-
-                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
-                  <div className="text-[10px] uppercase font-bold text-amber-700">
-                    Ticket promedio
-                  </div>
-
-                  <div className="text-xl font-black text-slate-900 mt-1">
-                    $
-                    {salesHistory.length
-                      ? (
-                          salesHistory.reduce(
-                            (a, s) =>
-                              a +
-                              s.totalUSD,
-                            0
-                          ) /
-                          salesHistory.length
-                        ).toFixed(
-                          2
-                        )
-                      : '0.00'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="h-80 mt-6">
-                <ResponsiveContainer
-                  width="100%"
-                  height="100%"
-                >
-                  <BarChart
-                    data={(() => {
-                      const map: Record<
-                        string,
-                        number
-                      > = {};
-
-                      salesHistory.forEach(
-                        s => {
-                          const d =
-                            new Date(
-                              s.created_at ||
-                                s.date
-                            );
-
-                          const key = `${d.getDate()}/${d.getMonth() + 1}`;
-
-                          map[key] =
-                            (map[key] ||
-                              0) +
-                            s.totalUSD;
-                        }
-                      );
-
-                      return Object.entries(
-                        map
-                      )
-                        .slice(-14)
-                        .map(
-                          ([
-                            date,
-                            total
-                          ]) => ({
-                            date,
-                            total:
-                              Number(
-                                total.toFixed(
-                                  2
-                                )
-                              )
-                          })
-                        );
-                    })()}
+                <div className="w-full lg:w-auto lg:min-w-[230px]">
+                  <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-slate-300">Período de análisis</label>
+                  <select
+                    value={reportFilterPeriod}
+                    onChange={e => setReportFilterPeriod(e.target.value as typeof reportFilterPeriod)}
+                    className="w-full rounded-xl border border-white/15 bg-slate-800 px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-cyan-400"
                   >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar
-                      dataKey="total"
-                      name="Ventas USD"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                    <option value="today">Hoy</option>
+                    <option value="week">Últimos 7 días</option>
+                    <option value="month">Últimos 30 días</option>
+                    <option value="currentMonth">Este mes</option>
+                    <option value="previousMonth">Mes anterior</option>
+                    <option value="all">Todo el historial</option>
+                    <option value="custom">Rango personalizado</option>
+                  </select>
+                </div>
               </div>
-            </div>
+              {reportFilterPeriod === 'custom' && (
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <label className="text-xs font-semibold text-slate-300">Desde
+                    <input type="date" value={reportStartDate} onChange={e => setReportStartDate(e.target.value)} className="mt-1 block w-full rounded-lg border border-white/15 bg-slate-800 px-3 py-2 text-sm text-white" />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-300">Hasta
+                    <input type="date" min={reportStartDate || undefined} value={reportEndDate} onChange={e => setReportEndDate(e.target.value)} className="mt-1 block w-full rounded-lg border border-white/15 bg-slate-800 px-3 py-2 text-sm text-white" />
+                  </label>
+                </div>
+              )}
+              <div className="mt-4 text-xs text-slate-400">{reportSales.length} ventas incluidas en el análisis</div>
+            </section>
 
-            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 uppercase text-[10px] font-bold">
-                    <th className="p-3">
-                      ID
-                    </th>
+            <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+              <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+                <div className="flex items-center justify-between"><span className="text-xs font-bold uppercase text-slate-500">Ventas totales</span><span className="rounded-xl bg-blue-50 p-2 text-blue-700">$</span></div>
+                <p className="mt-3 text-2xl font-black text-slate-900">${reportTotalUSD.toFixed(2)}</p>
+                <p className="mt-1 text-xs text-slate-500">Bs. {reportTotalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} equivalentes registrados</p>
+              </div>
+              <div className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+                <div className="flex items-center justify-between"><span className="text-xs font-bold uppercase text-slate-500">Ganancia bruta</span><span className="rounded-xl bg-emerald-50 p-2 text-emerald-700">↗</span></div>
+                <p className="mt-3 text-2xl font-black text-emerald-700">{reportGrossProfit === null ? 'No disponible' : `$${reportGrossProfit.toFixed(2)}`}</p>
+                <p className="mt-1 text-xs text-slate-500">{reportGrossProfit === null ? 'Faltan costos históricos en el detalle de ventas' : `Costo de ventas: $${(reportCostOfGoods || 0).toFixed(2)}`}</p>
+              </div>
+              <div className="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm">
+                <div className="flex items-center justify-between"><span className="text-xs font-bold uppercase text-slate-500">Transacciones</span><span className="rounded-xl bg-violet-50 p-2 text-violet-700">▤</span></div>
+                <p className="mt-3 text-2xl font-black text-slate-900">{reportSales.length}</p>
+                <p className="mt-1 text-xs text-slate-500">Operaciones registradas</p>
+              </div>
+              <div className="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm">
+                <div className="flex items-center justify-between"><span className="text-xs font-bold uppercase text-slate-500">Ticket promedio</span><span className="rounded-xl bg-amber-50 p-2 text-amber-700">◉</span></div>
+                <p className="mt-3 text-2xl font-black text-slate-900">${reportAverageTicket.toFixed(2)}</p>
+                <p className="mt-1 text-xs text-slate-500">Promedio por operación</p>
+              </div>
+            </section>
 
-                    <th className="p-3">
-                      Fecha
-                    </th>
+            <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[{ label: 'Operaciones en USD', value: reportCurrencyStats['USD'] || 0, note: 'Efectivo USD' }, { label: 'Operaciones en Bs.', value: reportCurrencyStats['Bs'] || 0, note: 'Efectivo Bs.' }, { label: 'Otros / no especificado', value: reportCurrencyStats['No especificada en el registro'] || 0, note: 'Medios sin moneda explícita' }].map(item => <div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs font-bold text-slate-500">{item.label}</p><p className="mt-2 text-2xl font-black text-slate-900">{item.value}</p><p className="mt-1 text-[10px] text-slate-500">{item.note}</p></div>)}
+            </section>
 
-                    <th className="p-3">
-                      Cliente
-                    </th>
+            <section className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+              <div className="xl:col-span-2 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-3"><div><h3 className="font-extrabold text-slate-900">Evolución de ventas</h3><p className="mt-1 text-xs text-slate-500">Ventas diarias expresadas en USD equivalente</p></div><span className="rounded-full bg-blue-50 px-3 py-1 text-[10px] font-bold text-blue-700">Tendencia</span></div>
+                <div className="mt-5 h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={reportDailySales} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} />
+                      <Tooltip formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Ventas']} />
+                      <Line type="monotone" dataKey="total" name="Ventas USD" stroke="#2563eb" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 6 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {reportSales.length === 0 && <p className="text-center text-sm text-slate-400">No hay ventas en el período seleccionado.</p>}
+              </div>
+              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h3 className="font-extrabold text-slate-900">Métodos de pago</h3>
+                <p className="mt-1 text-xs text-slate-500">Qué medios utilizan más tus clientes</p>
+                <div className="mt-4 space-y-4">
+                  {reportPaymentStats.map((item: any) => {
+                    const share = reportSales.length ? (item.transactions / reportSales.length) * 100 : 0;
+                    return <div key={item.method}>
+                      <div className="mb-1 flex justify-between gap-2 text-xs"><span className="font-semibold text-slate-700">{item.method}</span><span className="font-bold text-slate-900">{item.transactions} ({share.toFixed(0)}%)</span></div>
+                      <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{ width: `${share}%` }} /></div>
+                      <p className="mt-1 text-[10px] text-slate-500">${item.amountUSD.toFixed(2)} equivalente</p>
+                    </div>;
+                  })}
+                  {reportPaymentStats.length === 0 && <p className="py-8 text-center text-sm text-slate-400">Sin movimientos para mostrar.</p>}
+                </div>
+                <p className="mt-4 rounded-xl bg-amber-50 p-3 text-[11px] leading-relaxed text-amber-800">La distribución se basa en el método principal guardado en cada venta. Los pagos mixtos se muestran como una categoría independiente.</p>
+              </div>
+            </section>
 
-                    <th className="p-3">
-                      Método
-                    </th>
+            <section className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div><h3 className="font-extrabold text-slate-900">Productos con más salidas</h3><p className="mt-1 text-xs text-slate-500">Los productos que más unidades han vendido</p></div>
+                <div className="mt-4 h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={reportProductsByUnits} layout="vertical" margin={{ top: 4, right: 15, left: 8, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 10 }} />
+                      <YAxis type="category" dataKey="name" width={105} tick={{ fontSize: 10 }} />
+                      <Tooltip formatter={(value: any) => [`${value} unidades`, 'Salidas']} />
+                      <Bar dataKey="units" name="Unidades" fill="#0891b2" radius={[0, 6, 6, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                {reportProductsByUnits.length === 0 && <p className="text-center text-sm text-slate-400">No hay detalle de productos para este período.</p>}
+              </div>
+              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div><h3 className="font-extrabold text-slate-900">Productos más rentables</h3><p className="mt-1 text-xs text-slate-500">Ordenados por ganancia generada</p></div>
+                {reportProductsByProfit.length > 0 ? <div className="mt-4 space-y-3">
+                  {reportProductsByProfit.map((item: any, index: number) => <div key={item.name} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-xs font-black text-emerald-800">{index + 1}</span>
+                    <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-slate-800">{item.name}</p><p className="text-[11px] text-slate-500">{item.units} unidades vendidas</p></div>
+                    <p className="text-sm font-black text-emerald-700">${item.profit.toFixed(2)}</p>
+                  </div>)}
+                </div> : <div className="mt-5 rounded-2xl border border-dashed border-amber-300 bg-amber-50 p-5 text-sm leading-relaxed text-amber-900">No podemos calcular el ranking de rentabilidad todavía. Las ventas deben conservar el costo del producto al momento de venderse. Así evitamos utilizar costos actuales para estimar ganancias pasadas.</div>}
+                {reportHasProductDetails && !reportHasCompleteCosts && <p className="mt-3 text-[11px] text-amber-700">Este ranking incluye solamente productos cuyo detalle de venta contiene un costo registrado.</p>}
+              </div>
+            </section>
 
-                    <th className="p-3">
-                      Total USD
-                    </th>
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"><div><h3 className="font-extrabold text-slate-900">Resultado del negocio</h3><p className="mt-1 text-xs text-slate-500">Rentabilidad del período seleccionado</p></div><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">Resumen financiero</span></div>
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-semibold text-slate-500">Ventas netas de IVA*</p><p className="mt-2 text-xl font-black text-slate-900">${reportSales.reduce((sum, sale) => sum + Number(sale.subtotalUSD || 0), 0).toFixed(2)}</p></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-semibold text-slate-500">Costo de productos vendidos</p><p className="mt-2 text-xl font-black text-slate-900">{reportCostOfGoods === null ? 'No disponible' : `$${reportCostOfGoods.toFixed(2)}`}</p></div>
+                <div className="rounded-2xl bg-emerald-50 p-4"><p className="text-xs font-semibold text-emerald-800">Ganancia neta estimada</p><p className="mt-2 text-xl font-black text-emerald-900">Pendiente de Finanzas</p><p className="mt-1 text-[10px] text-emerald-800">Se habilitará al integrar gastos operativos registrados.</p></div>
+              </div>
+              <p className="mt-3 text-[10px] leading-relaxed text-slate-500">*El subtotal corresponde al valor de los productos antes del IVA. La ganancia bruta solo se presenta cuando todos los artículos del período tienen su costo histórico disponible. La ganancia neta requiere descontar los gastos operativos clasificados en Finanzas.</p>
+            </section>
 
-                    <th className="p-3">
-                      Total Bs.
-                    </th>
-
-                    <th className="p-3">
-                      Caja
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-slate-100">
-                  {salesHistory
-                    .filter(s => {
-                      if (
-                        reportFilterPeriod ===
-                        'all'
-                      )
-                        return true;
-
-                      const date =
-                        new Date(
-                          s.created_at ||
-                            s.date
-                        );
-
-                      const now =
-                        new Date();
-
-                      const diff =
-                        now.getTime() -
-                        date.getTime();
-
-                      if (
-                        reportFilterPeriod ===
-                        'today'
-                      ) {
-                        return (
-                          date.toDateString() ===
-                          now.toDateString()
-                        );
-                      }
-
-                      if (
-                        reportFilterPeriod ===
-                        'week'
-                      ) {
-                        return (
-                          diff <=
-                          7 *
-                            86400000
-                        );
-                      }
-
-                      return (
-                        diff <=
-                        30 *
-                          86400000
-                      );
-                    })
-                    .map(
-                      s => (
-                        <tr
-                          key={
-                            s.id
-                          }
-                          className="hover:bg-slate-50/70"
-                        >
-                          <td className="p-3 font-bold">
-                            #
-                            {s.id}
-                          </td>
-
-                          <td className="p-3 text-slate-500">
-                            {new Date(
-                              s.created_at ||
-                                s.date
-                            ).toLocaleString()}
-                          </td>
-
-                          <td className="p-3 font-semibold">
-                            {s.clientName ||
-                              'Cliente Genérico'}
-                          </td>
-
-                          <td className="p-3">
-                            {
-                              s.paymentMethod
-                            }
-                          </td>
-
-                          <td className="p-3 font-black">
-                            $
-                            {s.totalUSD.toFixed(
-                              2
-                            )}
-                          </td>
-
-                          <td className="p-3">
-                            Bs.{' '}
-                            {s.totalBs.toFixed(
-                              2
-                            )}
-                          </td>
-
-                          <td className="p-3">
-                            #
-                            {s.cashRegisterId ||
-                              '—'}
-                          </td>
-                        </tr>
-                      )
-                    )}
-                </tbody>
-              </table>
-            </div>
+            <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-100 p-5"><h3 className="font-extrabold text-slate-900">Historial de transacciones</h3><p className="mt-1 text-xs text-slate-500">Detalle de las ventas incluidas en este análisis</p></div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-left text-xs">
+                  <thead><tr className="bg-slate-50 text-[10px] uppercase text-slate-500"><th className="p-3">ID</th><th className="p-3">Fecha</th><th className="p-3">Cliente</th><th className="p-3">Método de pago</th><th className="p-3">Total USD</th><th className="p-3">Total Bs.</th><th className="p-3">Caja</th></tr></thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {reportSales.map(sale => <tr key={sale.id} className="hover:bg-slate-50/70">
+                      <td className="p-3 font-bold">#{sale.id}</td>
+                      <td className="p-3 text-slate-500">{new Date(sale.created_at || sale.date).toLocaleString('es-VE')}</td>
+                      <td className="p-3 font-semibold">{sale.clientName || 'Cliente Genérico'}</td>
+                      <td className="p-3">{sale.paymentMethod}</td>
+                      <td className="p-3 font-black">${Number(sale.totalUSD || 0).toFixed(2)}</td>
+                      <td className="p-3">Bs. {Number(sale.totalBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="p-3">#{sale.cashRegisterId || '—'}</td>
+                    </tr>)}
+                    {reportSales.length === 0 && <tr><td colSpan={7} className="p-10 text-center text-slate-400">No hay ventas para el período seleccionado.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </div>
         )}
 
